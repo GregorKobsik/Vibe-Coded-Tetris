@@ -57,6 +57,10 @@ class TetrisGame {
         this.startTime = null;
         this.piecesDropped = 0;
         
+        // Track scoring per level
+        this.levelScores = Array(5).fill(0); // Points gained per level (index 0 = level 1)
+        this.levelRowPoints = 0; // Points from row completion in current level
+        
         // Game timing
         this.dropTimer = 0;
         this.dropInterval = 1000; // 1 second initially
@@ -180,16 +184,22 @@ class TetrisGame {
         // Handle level completion continue
         if (this.waitingForContinue) {
             this.waitingForContinue = false;
+            this.paused = false; // Resume the game
             document.getElementById('gameOverlay').classList.add('hidden');
+            
+            // Clear board for next level and prepare game state
+            this.board = Array(this.BOARD_HEIGHT).fill().map(() => Array(this.BOARD_WIDTH).fill(0));
+            this.currentPiece = null;
+            this.holdPiece = null;
+            this.generateInitialPieces();
             this.spawnPiece();
+            
+            // Restart the game loop
+            this.gameLoop();
             return;
         }
         
         if (!this.gameRunning || this.paused || this.gameOver) {
-            if (e.code === 'Space' && this.gameOver) {
-                this.resetGame();
-                this.startGame();
-            }
             if (e.code === 'KeyP') {
                 this.togglePause();
             }
@@ -284,6 +294,10 @@ class TetrisGame {
         this.piecesDropped = 0;
         this.dropInterval = 1000;
         this.canHold = true;
+        
+        // Reset level tracking
+        this.levelScores = Array(5).fill(0);
+        this.levelRowPoints = 0;
         
         // Clear board
         this.board = Array(this.BOARD_HEIGHT).fill().map(() => Array(this.BOARD_WIDTH).fill(0));
@@ -448,7 +462,6 @@ class TetrisGame {
         }
         
         this.currentPiece.y += dropDistance;
-        this.score += dropDistance * 2; // Bonus points for hard drop
         
         // Play hard drop sound
         this.playSound(130, 0.2, 'sawtooth', 0.2);
@@ -518,10 +531,6 @@ class TetrisGame {
             }
         }
         
-        // Bonus points for smaller pieces (they're harder to place strategically)
-        const sizeBonus = Math.max(0, 5 - blockCount); // 1-block = 4 bonus, 2-block = 3 bonus, etc.
-        this.score += sizeBonus;
-        
         // Play lock sound
         this.playSound(165, 0.1, 'triangle', 0.15);
         
@@ -584,6 +593,7 @@ class TetrisGame {
             }
             
             this.score += rowScore;
+            this.levelRowPoints += rowScore; // Track row points for current level
             
             this.updateDisplay();
         }
@@ -593,6 +603,10 @@ class TetrisGame {
         // Calculate bonus points for connected regions before clearing the board
         const regionBonus = this.calculateConnectedRegionBonus();
         this.score += regionBonus;
+        
+        // Store total points gained in this level (before incrementing level)
+        const levelIndex = this.level - 1; // Convert to 0-based index
+        this.levelScores[levelIndex] = this.levelRowPoints + regionBonus;
         
         // Level completed when board is full
         this.level++;
@@ -606,20 +620,20 @@ class TetrisGame {
             return;
         }
         
-        // Clear board for next level
-        this.board = Array(this.BOARD_HEIGHT).fill().map(() => Array(this.BOARD_WIDTH).fill(0));
-        this.currentPiece = null;
-        this.holdPiece = null;
-        this.generateInitialPieces();
-        
-        // Show level completion overlay with bonus information
+        // Show level completion overlay with bonus information (keep board visible)
         const bonusText = regionBonus > 0 ? `Region Bonus: +${regionBonus.toLocaleString()}` : '';
-        let message = `Starting Level ${this.level}<br><br>Score: ${this.score.toLocaleString()}<br>Completed Rows: +${this.linesCleared}`;
+        let message = `Starting Level ${this.level}<br><br>Score: ${this.score.toLocaleString()}<br>Completed Rows: +${this.levelRowPoints}`;
         if (bonusText) {
             message += `<br>${bonusText}`;
         }
         message += `<br><br>Press any key to continue`;
         this.showOverlay(`Level ${this.level - 1} Complete!`, message);
+        
+        // Reset row points for next level
+        this.levelRowPoints = 0;
+        
+        // Pause the game while showing level complete message
+        this.paused = true;
         
         // Set flag to wait for user input before continuing
         this.waitingForContinue = true;
@@ -775,7 +789,7 @@ class TetrisGame {
     
     drawGrid() {
         const isLightMode = document.body.classList.contains('light-mode');
-        this.ctx.strokeStyle = isLightMode ? 'rgba(128, 128, 128, 0.2)' : 'rgba(255, 255, 255, 0.05)';
+        this.ctx.strokeStyle = isLightMode ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.05)';
         this.ctx.lineWidth = 1;
         
         // Vertical lines
@@ -952,9 +966,20 @@ class TetrisGame {
         this.startGame();
     }
     
+    startNewGame() {
+        this.resetGame();
+        this.startGameFromInfo();
+    }
+    
     endGame() {
         this.gameOver = true;
         this.gameRunning = false;
+        
+        // Store final level score if game ended mid-level
+        if (this.level <= 5) {
+            const levelIndex = this.level - 1;
+            this.levelScores[levelIndex] = this.levelRowPoints;
+        }
         
         // Clear next pieces display when game ends
         this.clearNextPiecesDisplay();
@@ -964,11 +989,21 @@ class TetrisGame {
         
         document.getElementById('pauseButton').disabled = true;
         
+        // Create detailed score breakdown
+        let levelBreakdown = '';
+        for (let i = 0; i < 5; i++) {
+            if (this.levelScores[i] > 0 || i < this.level - 1) {
+                levelBreakdown += `Level ${i + 1}: ${this.levelScores[i].toLocaleString()} points<br>`;
+            }
+        }
+        
         // Show appropriate message based on whether all levels were completed
         if (this.level > 5) {
-            this.showOverlay('🎉 Congratulations! 🎉', `All 5 levels completed! Final Score: ${this.score.toLocaleString()} | Press SPACE to play again`);
+            const message = `🎉 All 5 levels completed! 🎉<br><br>Final Score: ${this.score.toLocaleString()}<br><br>Points by Level:<br>${levelBreakdown}<br><button onclick="window.tetrisGame.startNewGame()" class="game-button" style="margin-top: 15px;">Start New Game</button>`;
+            this.showOverlay('Game Over!', message);
         } else {
-            this.showOverlay('Game Over', `Level ${this.level} | Final Score: ${this.score.toLocaleString()} | Press SPACE to restart`);
+            const message = `Game Over - Level ${this.level}<br><br>Final Score: ${this.score.toLocaleString()}<br><br>Points by Level:<br>${levelBreakdown}<br><button onclick="window.tetrisGame.startNewGame()" class="game-button" style="margin-top: 15px;">Start New Game</button>`;
+            this.showOverlay('Game Over', message);
         }
     }
     

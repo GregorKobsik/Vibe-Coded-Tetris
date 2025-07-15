@@ -35,7 +35,7 @@ body {
 .header h1 {
     font-size: 3rem;
     font-weight: bold;
-    background: linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4);
+    background: linear-gradient(45deg, #ff6b6b, #3498db, #2980b9, #96ceb4);
     background-size: 300% 300%;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -77,13 +77,13 @@ body {
 }
 
 .panel-header:hover {
-    color: #45b7d1;
+    color: #3498db;
 }
 
 .toggle-icon {
     font-size: 0.8rem;
     transition: transform 0.3s ease;
-    color: #4ecdc4;
+    color: #2980b9;
 }
 
 .toggle-icon.collapsed {
@@ -128,7 +128,7 @@ body {
 .info-panel h3 {
     text-align: center;
     margin-bottom: 15px;
-    color: #4ecdc4;
+    color: #3498db;
     font-size: 1.1rem;
 }
 
@@ -188,7 +188,7 @@ kbd {
 
 .stat-value {
     font-weight: bold;
-    color: #4ecdc4;
+    color: #3498db;
 }
 
 .game-overlay {
@@ -197,7 +197,7 @@ kbd {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.8);
+    background: rgba(0, 0, 0, 0.4);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -211,10 +211,10 @@ kbd {
 
 .overlay-content {
     text-align: center;
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
     padding: 30px;
     border-radius: 15px;
-    border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .overlay-content h2 {
@@ -228,8 +228,21 @@ kbd {
     opacity: 0.9;
 }
 
+/* Make game overlay content (level complete, pause, etc.) match game board size */
+#gameOverlay .overlay-content {
+    width: 320px;
+    height: 605px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    box-sizing: border-box;
+    margin: 0;
+    max-width: none;
+}
+
 .game-button {
-    background: linear-gradient(45deg, #4ecdc4, #45b7d1);
+    background: linear-gradient(45deg, #3498db, #2980b9);
     color: white;
     border: none;
     padding: 12px 24px;
@@ -238,14 +251,13 @@ kbd {
     font-weight: 600;
     cursor: pointer;
     transition: all 0.3s ease;
-    border: 1px solid rgba(255, 255, 255, 0.2);
     backdrop-filter: blur(10px);
 }
 
 .game-button:hover:not(:disabled) {
     transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(78, 205, 196, 0.4);
-    background: linear-gradient(45deg, #45b7d1, #4ecdc4);
+    box-shadow: 0 5px 15px rgba(52, 152, 219, 0.4);
+    background: linear-gradient(45deg, #2980b9, #3498db);
 }
 
 .game-button:active:not(:disabled) {
@@ -268,9 +280,8 @@ kbd {
 
 /* Toggle Switch Styling */
 .toggle-section {
-    margin-top: 15px;
-    padding-top: 15px;
-    border-top: 1px solid rgba(255, 255, 255, 0.2);
+    margin-top: 0;
+    padding-top: 0;
 }
 
 .toggle-row {
@@ -297,7 +308,7 @@ kbd {
 }
 
 .toggle-switch.active {
-    background: linear-gradient(45deg, #4ecdc4, #45b7d1);
+    background: linear-gradient(45deg, #3498db, #2980b9);
 }
 
 .toggle-slider {
@@ -318,23 +329,25 @@ kbd {
 
 /* Light mode styles */
 body.light-mode {
-    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    background: linear-gradient(135deg, #e0e2e8 0%, #a8b4c8 100%);
     color: #333;
 }
 
 body.light-mode .game-container {
-    background: rgba(255, 255, 255, 0.9);
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(20px);
     border: 1px solid rgba(0, 0, 0, 0.1);
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
 }
 
 body.light-mode .info-panel {
-    background: rgba(255, 255, 255, 0.8);
-    border: 1px solid rgba(0, 0, 0, 0.1);
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(0, 0, 0, 0.2);
 }
 
 body.light-mode .info-panel h3 {
-    color: #2c3e50;
+    color: #2980b9;
 }
 
 body.light-mode .stat-value {
@@ -356,12 +369,13 @@ body.light-mode #nextPiece3 {
 }
 
 body.light-mode .game-overlay {
-    background: rgba(255, 255, 255, 0.9);
+    background: rgba(200, 200, 200, 0.3);
+    backdrop-filter: blur(10px);
 }
 
 body.light-mode .overlay-content {
-    background: rgba(255, 255, 255, 0.9);
-    border: 1px solid rgba(0, 0, 0, 0.1);
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
     color: #333;
 }
 
@@ -379,25 +393,24 @@ body.light-mode .stat-row {
 }
 
 body.light-mode .toggle-section {
-    border-top: 1px solid rgba(0, 0, 0, 0.2);
+    border-top: none;
 }
 
 body.light-mode .game-button {
     background: linear-gradient(45deg, #3498db, #2980b9);
     color: white;
-    border: 2px solid rgba(0, 0, 0, 0.2);
+    border: none;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 body.light-mode .game-button:hover:not(:disabled) {
     background: linear-gradient(45deg, #2980b9, #3498db);
-    border: 2px solid rgba(0, 0, 0, 0.3);
     box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
 }
 
 body.light-mode .game-button:disabled {
     background: linear-gradient(45deg, #95a5a6, #7f8c8d);
-    border: 2px solid rgba(0, 0, 0, 0.1);
+    border: none;
     opacity: 0.6;
 }
 
@@ -409,15 +422,20 @@ body.light-mode kbd {
 
 /* Info Screen Styles */
 .info-content {
-    max-width: 500px;
+    width: 320px;
+    height: 605px;
     text-align: left;
-    padding: 40px;
+    padding: 30px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    box-sizing: border-box;
 }
 
 .info-content h2 {
     text-align: center;
     margin-bottom: 20px;
-    color: #4ecdc4;
+    color: #3498db;
     font-size: 1.8rem;
 }
 
@@ -428,6 +446,10 @@ body.light-mode kbd {
 
 .info-text {
     margin-bottom: 30px;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
 }
 
 .info-text p {
@@ -439,7 +461,7 @@ body.light-mode kbd {
 .info-button {
     display: block;
     margin: 0 auto;
-    background: linear-gradient(45deg, #4ecdc4, #45b7d1);
+    background: linear-gradient(45deg, #3498db, #2980b9);
     color: white;
     border: none;
     padding: 15px 30px;
@@ -448,14 +470,20 @@ body.light-mode kbd {
     font-weight: 600;
     cursor: pointer;
     transition: all 0.3s ease;
-    border: 1px solid rgba(255, 255, 255, 0.2);
     backdrop-filter: blur(10px);
 }
 
 .info-button:hover {
     transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(78, 205, 196, 0.4);
-    background: linear-gradient(45deg, #45b7d1, #4ecdc4);
+    box-shadow: 0 5px 15px rgba(52, 152, 219, 0.4);
+    background: linear-gradient(45deg, #2980b9, #3498db);
+}
+
+/* Override overlay content for info screen to remove default centering */
+#infoOverlay .overlay-content {
+    margin: 0;
+    max-width: none;
+    border-radius: 15px;
 }
 
 /* Responsive Design */
