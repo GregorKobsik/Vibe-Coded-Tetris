@@ -21,7 +21,6 @@
                 
                 <div class="info-panel">
                     <div class="game-controls">
-                        <button id="startButton" class="game-button">Start Game</button>
                         <button id="pauseButton" class="game-button" disabled>Pause</button>
                         <button id="resetButton" class="game-button">Reset</button>
                     </div>
@@ -65,6 +64,26 @@
                     <div class="overlay-content">
                         <h2 id="overlayTitle">Game Over</h2>
                         <p id="overlayMessage">Press SPACE to start a new game</p>
+                    </div>
+                </div>
+                <div id="infoOverlay" class="game-overlay">
+                    <div class="overlay-content info-content">
+                        <div class="info-text">
+                            <p><strong>Game Rules:</strong></p>
+                            <p>• Complete 5 levels</p>
+                            <p>• Each level ends when the board is completely full</p>
+                            <p>• Completed rows stay on the board and award points</p>
+                            <br>
+                            <p><strong>Scoring System:</strong></p>
+                            <p>• Single row: 10 points</p>
+                            <p>• Double rows: 60 points</p>
+                            <p>• Triple rows: 120 points</p>
+                            <p>• Tetris (4+ rows): 200 points</p>
+                            <p>• Level bonus: Largest connected regions × 20 × level</p>
+                            <br>
+                            <p><strong>Controls:</strong> Arrow keys to move, C to hold, Space to hard drop</p>
+                        </div>
+                        <button id="startInfoButton" class="info-button">Start Game</button>
                     </div>
                 </div>
             </div>

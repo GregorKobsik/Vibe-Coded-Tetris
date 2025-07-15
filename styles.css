@@ -407,6 +407,57 @@ body.light-mode kbd {
     color: #2c3e50;
 }
 
+/* Info Screen Styles */
+.info-content {
+    max-width: 500px;
+    text-align: left;
+    padding: 40px;
+}
+
+.info-content h2 {
+    text-align: center;
+    margin-bottom: 20px;
+    color: #4ecdc4;
+    font-size: 1.8rem;
+}
+
+.info-content strong {
+    color: #e74c3c;
+    font-weight: 600;
+}
+
+.info-text {
+    margin-bottom: 30px;
+}
+
+.info-text p {
+    margin: 5px 0;
+    font-size: 0.95rem;
+    line-height: 1.4;
+}
+
+.info-button {
+    display: block;
+    margin: 0 auto;
+    background: linear-gradient(45deg, #4ecdc4, #45b7d1);
+    color: white;
+    border: none;
+    padding: 15px 30px;
+    border-radius: 25px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+}
+
+.info-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(78, 205, 196, 0.4);
+    background: linear-gradient(45deg, #45b7d1, #4ecdc4);
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
     .game-area {

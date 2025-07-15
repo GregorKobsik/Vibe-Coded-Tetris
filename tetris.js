@@ -48,6 +48,7 @@ class TetrisGame {
         this.gameRunning = false;
         this.gameOver = false;
         this.paused = false;
+        this.waitingForContinue = false;
         
         // Game statistics
         this.score = 0;
@@ -61,103 +62,99 @@ class TetrisGame {
         this.dropInterval = 1000; // 1 second initially
         this.lastTime = 0;
         
+        // Matplotlib tab10 color palette (first 6 colors)
+        this.colorPalette = [
+            '#1f77b4', // Blue
+            '#ff7f0e', // Orange
+            '#2ca02c', // Green
+            '#d62728', // Red
+            '#9467bd', // Purple
+            '#8c564b'  // Brown
+        ];
+        
         // Tetris pieces - All combinations of 1, 2, and 3 block pieces
         this.pieces = {
             // 1-block pieces
             DOT: {
-                shape: [[1]],
-                color: '#ff69b4' // Hot pink
+                shape: [[1]]
             },
             
             // 2-block pieces
             I2_H: {
-                shape: [[1, 1]], // Horizontal 2-block
-                color: '#00ffff' // Cyan
+                shape: [[1, 1]] // Horizontal 2-block
             },
             I2_V: {
                 shape: [
                     [1],
                     [1]
-                ], // Vertical 2-block
-                color: '#87ceeb' // Sky blue
+                ] // Vertical 2-block
             },
             
             // 3-block pieces
             I3_H: {
-                shape: [[1, 1, 1]], // Horizontal 3-block
-                color: '#00f5ff' // Light cyan
+                shape: [[1, 1, 1]] // Horizontal 3-block
             },
             I3_V: {
                 shape: [
                     [1],
                     [1],
                     [1]
-                ], // Vertical 3-block
-                color: '#4169e1' // Royal blue
+                ] // Vertical 3-block
             },
             L3: {
                 shape: [
                     [1, 0],
                     [1, 1]
-                ], // L-shaped 3-block
-                color: '#ff8c00' // Dark orange
+                ] // L-shaped 3-block
             },
             J3: {
                 shape: [
                     [0, 1],
                     [1, 1]
-                ], // J-shaped 3-block (mirror of L3)
-                color: '#9370db' // Medium purple
+                ] // J-shaped 3-block (mirror of L3)
             },
             
             // Original 4-block pieces (classic tetrominoes) - keeping for variety
             I4: {
                 shape: [
                     [1, 1, 1, 1]
-                ],
-                color: '#00f5ff'
+                ]
             },
             O4: {
                 shape: [
                     [1, 1],
                     [1, 1]
-                ],
-                color: '#ffed00'
+                ]
             },
             T4: {
                 shape: [
                     [0, 1, 0],
                     [1, 1, 1]
-                ],
-                color: '#a000f0'
+                ]
             },
             S4: {
                 shape: [
                     [0, 1, 1],
                     [1, 1, 0]
-                ],
-                color: '#00f000'
+                ]
             },
             Z4: {
                 shape: [
                     [1, 1, 0],
                     [0, 1, 1]
-                ],
-                color: '#f00000'
+                ]
             },
             J4: {
                 shape: [
                     [1, 0, 0],
                     [1, 1, 1]
-                ],
-                color: '#0000f0'
+                ]
             },
             L4: {
                 shape: [
                     [0, 0, 1],
                     [1, 1, 1]
-                ],
-                color: '#f0a000'
+                ]
             }
         };
         
@@ -174,12 +171,20 @@ class TetrisGame {
         document.addEventListener('keydown', (e) => this.handleKeyPress(e));
         
         // Button controls
-        document.getElementById('startButton').addEventListener('click', () => this.startGame());
+        document.getElementById('startInfoButton').addEventListener('click', () => this.startGameFromInfo());
         document.getElementById('pauseButton').addEventListener('click', () => this.togglePause());
         document.getElementById('resetButton').addEventListener('click', () => this.resetGame());
     }
     
     handleKeyPress(e) {
+        // Handle level completion continue
+        if (this.waitingForContinue) {
+            this.waitingForContinue = false;
+            document.getElementById('gameOverlay').classList.add('hidden');
+            this.spawnPiece();
+            return;
+        }
+        
         if (!this.gameRunning || this.paused || this.gameOver) {
             if (e.code === 'Space' && this.gameOver) {
                 this.resetGame();
@@ -241,7 +246,6 @@ class TetrisGame {
         this.paused = false;
         this.startTime = Date.now();
         
-        document.getElementById('startButton').disabled = true;
         document.getElementById('pauseButton').disabled = false;
         document.getElementById('gameOverlay').classList.add('hidden');
         
@@ -273,8 +277,9 @@ class TetrisGame {
         this.gameRunning = false;
         this.gameOver = false;
         this.paused = false;
+        this.waitingForContinue = false;
         this.score = 0;
-        this.level = 1;
+        this.level = 1; // Start at level 1
         this.linesCleared = 0;
         this.piecesDropped = 0;
         this.dropInterval = 1000;
@@ -286,10 +291,10 @@ class TetrisGame {
         this.holdPiece = null;
         this.generateInitialPieces();
         
-        document.getElementById('startButton').disabled = false;
         document.getElementById('pauseButton').disabled = true;
         document.getElementById('pauseButton').textContent = 'Pause';
         document.getElementById('gameOverlay').classList.add('hidden');
+        document.getElementById('infoOverlay').classList.remove('hidden');
         
         this.updateDisplay();
         this.render();
@@ -308,10 +313,16 @@ class TetrisGame {
     
     createRandomPiece() {
         const type = this.pieceTypes[Math.floor(Math.random() * this.pieceTypes.length)];
+        
+        // Determine number of colors available based on level (level 1: 2 colors, level 2: 3 colors, etc.)
+        const availableColors = Math.min(this.level + 1, 6);
+        const colorIndex = Math.floor(Math.random() * availableColors);
+        const color = this.colorPalette[colorIndex];
+        
         return {
             type: type,
             shape: this.pieces[type].shape,
-            color: this.pieces[type].color,
+            color: color,
             x: Math.floor(this.BOARD_WIDTH / 2) - Math.floor(this.pieces[type].shape[0].length / 2),
             y: 0
         };
@@ -330,9 +341,9 @@ class TetrisGame {
         this.piecesDropped++;
         this.canHold = true; // Reset hold ability for new piece
         
-        // Check for game over
+        // Check for level completion (board is full - piece placed outside board)
         if (this.isColliding(this.currentPiece, 0, 0)) {
-            this.endGame();
+            this.completeLevel();
             return;
         }
     }
@@ -514,64 +525,111 @@ class TetrisGame {
         // Play lock sound
         this.playSound(165, 0.1, 'triangle', 0.15);
         
-        // Check for completed lines
-        this.clearLines();
+        // Check for completed rows (but don't remove them)
+        this.checkCompletedRows();
         
         // Spawn next piece
         this.spawnPiece();
     }
     
-    clearLines() {
-        let linesCleared = 0;
-        let clearedRows = [];
+    checkCompletedRows() {
+        let newlyCompletedRows = 0;
+        const rowsToCheck = [];
         
-        for (let y = this.BOARD_HEIGHT - 1; y >= 0; y--) {
-            if (this.board[y].every(cell => cell !== 0)) {
-                clearedRows.push(y);
-                // Create line clear particles
-                for (let x = 0; x < this.BOARD_WIDTH; x++) {
-                    this.createParticles(
-                        x * this.BLOCK_SIZE, 
-                        y * this.BLOCK_SIZE, 
-                        this.board[y][x], 
-                        6
-                    );
+        // Only check rows where the current piece was placed
+        if (this.currentPiece) {
+            for (let y = 0; y < this.currentPiece.shape.length; y++) {
+                const boardY = this.currentPiece.y + y;
+                if (boardY >= 0 && boardY < this.BOARD_HEIGHT) {
+                    rowsToCheck.push(boardY);
                 }
-                
-                // Remove completed line
-                this.board.splice(y, 1);
-                // Add empty line at top
-                this.board.unshift(Array(this.BOARD_WIDTH).fill(0));
-                linesCleared++;
-                y++; // Check same row again
             }
         }
         
-        if (linesCleared > 0) {
-            // Play line clear sound based on number of lines
-            const frequencies = [0, 440, 523, 659, 880]; // None, single, double, triple, tetris
-            this.playSound(frequencies[linesCleared] || 880, 0.3, 'triangle', 0.25);
-            
-            this.linesCleared += linesCleared;
-            
-            // Adjusted score calculation for smaller pieces gameplay
-            const lineScores = [0, 20, 60, 180, 800]; // Reduced from original to balance smaller pieces
-            this.score += lineScores[linesCleared] * this.level;
-            
-            // Level progression (every 15 lines instead of 10 to account for faster gameplay)
-            const newLevel = Math.floor(this.linesCleared / 15) + 1;
-            if (newLevel > this.level) {
-                this.level = newLevel;
-                this.dropInterval = Math.max(30, 1000 - (this.level - 1) * 40); // Faster progression
+        // Check only the rows affected by the current piece placement
+        for (let boardY of rowsToCheck) {
+            if (this.board[boardY].every(cell => cell !== 0)) {
+                newlyCompletedRows++;
                 
-                // Play level up sound
-                this.playSound(698, 0.2, 'triangle', 0.2);
+                // Create celebration particles for newly completed row
+                for (let x = 0; x < this.BOARD_WIDTH; x++) {
+                    this.createParticles(
+                        x * this.BLOCK_SIZE, 
+                        boardY * this.BLOCK_SIZE, 
+                        this.board[boardY][x], 
+                        6
+                    );
+                }
             }
+        }
+        
+        if (newlyCompletedRows > 0) {
+            // Play completion sound based on number of rows
+            const frequencies = [0, 440, 523, 659, 880]; // None, single, double, triple, tetris
+            this.playSound(frequencies[newlyCompletedRows] || 880, 0.3, 'triangle', 0.25);
+            
+            this.linesCleared += newlyCompletedRows;
+            
+            // Enhanced scoring system for multiple simultaneous rows
+            let rowScore = 0;
+            
+            if (newlyCompletedRows === 1) {
+                rowScore = 10; // Fixed 10 points for single row
+            } else if (newlyCompletedRows === 2) {
+                rowScore = 60; // Fixed 60 points for double
+            } else if (newlyCompletedRows === 3) {
+                rowScore = 120; // Fixed 120 points for triple
+            } else if (newlyCompletedRows >= 4) {
+                rowScore = 200; // Fixed 200 points for tetris+
+            }
+            
+            this.score += rowScore;
             
             this.updateDisplay();
         }
     }
     
+    completeLevel() {
+        // Calculate bonus points for connected regions before clearing the board
+        const regionBonus = this.calculateConnectedRegionBonus();
+        this.score += regionBonus;
+        
+        // Level completed when board is full
+        this.level++;
+        
+        // Play level completion sound
+        this.playSound(698, 0.4, 'triangle', 0.3);
+        
+        if (this.level > 5) {
+            // Game completed after 5 levels
+            this.endGame();
+            return;
+        }
+        
+        // Clear board for next level
+        this.board = Array(this.BOARD_HEIGHT).fill().map(() => Array(this.BOARD_WIDTH).fill(0));
+        this.currentPiece = null;
+        this.holdPiece = null;
+        this.generateInitialPieces();
+        
+        // Show level completion overlay with bonus information
+        const bonusText = regionBonus > 0 ? `Region Bonus: +${regionBonus.toLocaleString()}` : '';
+        let message = `Starting Level ${this.level}<br><br>Score: ${this.score.toLocaleString()}<br>Completed Rows: +${this.linesCleared}`;
+        if (bonusText) {
+            message += `<br>${bonusText}`;
+        }
+        message += `<br><br>Press any key to continue`;
+        this.showOverlay(`Level ${this.level - 1} Complete!`, message);
+        
+        // Set flag to wait for user input before continuing
+        this.waitingForContinue = true;
+        
+        this.updateDisplay();
+        this.render();
+        this.clearNextPiecesDisplay();
+        this.renderAllNextPieces();
+    }
+
     gameLoop(currentTime = 0) {
         if (!this.gameRunning || this.paused || this.gameOver) return;
         
@@ -885,8 +943,13 @@ class TetrisGame {
     
     showOverlay(title, message) {
         document.getElementById('overlayTitle').textContent = title;
-        document.getElementById('overlayMessage').textContent = message;
+        document.getElementById('overlayMessage').innerHTML = message;
         document.getElementById('gameOverlay').classList.remove('hidden');
+    }
+    
+    startGameFromInfo() {
+        document.getElementById('infoOverlay').classList.add('hidden');
+        this.startGame();
     }
     
     endGame() {
@@ -899,10 +962,75 @@ class TetrisGame {
         // Play game over sound
         this.playSound(147, 0.5, 'sawtooth', 0.3); // D3 note
         
-        document.getElementById('startButton').disabled = false;
         document.getElementById('pauseButton').disabled = true;
         
-        this.showOverlay('Game Over', `Final Score: ${this.score.toLocaleString()} | Press SPACE to restart`);
+        // Show appropriate message based on whether all levels were completed
+        if (this.level > 5) {
+            this.showOverlay('🎉 Congratulations! 🎉', `All 5 levels completed! Final Score: ${this.score.toLocaleString()} | Press SPACE to play again`);
+        } else {
+            this.showOverlay('Game Over', `Level ${this.level} | Final Score: ${this.score.toLocaleString()} | Press SPACE to restart`);
+        }
+    }
+    
+    calculateConnectedRegionBonus() {
+        // Create a map to store the largest region size for each color
+        const colorRegions = new Map();
+        const visited = Array(this.BOARD_HEIGHT).fill().map(() => Array(this.BOARD_WIDTH).fill(false));
+        
+        // Find all connected regions using flood fill algorithm
+        for (let y = 0; y < this.BOARD_HEIGHT; y++) {
+            for (let x = 0; x < this.BOARD_WIDTH; x++) {
+                if (!visited[y][x] && this.board[y][x] !== 0) {
+                    const color = this.board[y][x];
+                    const regionSize = this.floodFill(x, y, color, visited);
+                    
+                    // Track the largest region for each color
+                    if (!colorRegions.has(color) || regionSize > colorRegions.get(color)) {
+                        colorRegions.set(color, regionSize);
+                    }
+                }
+            }
+        }
+        
+        // Calculate bonus using similar scoring to row completion
+        // Base score of 20 points per block in largest regions, scaled by level
+        const baseScore = 20;
+        let totalBonus = 0;
+        
+        for (let [color, largestRegion] of colorRegions) {
+            // Award points similar to row completion: base score per block * level
+            totalBonus += largestRegion * baseScore * this.level;
+        }
+        
+        return totalBonus;
+    }
+    
+    floodFill(startX, startY, targetColor, visited) {
+        // Boundary checks
+        if (startX < 0 || startX >= this.BOARD_WIDTH || 
+            startY < 0 || startY >= this.BOARD_HEIGHT ||
+            visited[startY][startX] || 
+            this.board[startY][startX] !== targetColor) {
+            return 0;
+        }
+        
+        // Mark as visited
+        visited[startY][startX] = true;
+        let regionSize = 1;
+        
+        // Recursively check all 4 directions (up, down, left, right)
+        const directions = [
+            [0, -1], // up
+            [0, 1],  // down
+            [-1, 0], // left
+            [1, 0]   // right
+        ];
+        
+        for (let [dx, dy] of directions) {
+            regionSize += this.floodFill(startX + dx, startY + dy, targetColor, visited);
+        }
+        
+        return regionSize;
     }
 }
 
