@@ -1998,24 +1998,6 @@ function toggleTheme() {
     }
 }
 
-// Panel Toggle Functionality
-function togglePanel(panelId) {
-    const panel = document.getElementById(panelId);
-    const toggleIcon = document.getElementById('controls-toggle');
-    
-    if (panel && toggleIcon) {
-        if (panel.classList.contains('collapsed')) {
-            panel.classList.remove('collapsed');
-            toggleIcon.classList.remove('collapsed');
-            toggleIcon.textContent = '▼';
-        } else {
-            panel.classList.add('collapsed');
-            toggleIcon.classList.add('collapsed');
-            toggleIcon.textContent = '▶';
-        }
-    }
-}
-
 // Initialize toggles on page load
 document.addEventListener('DOMContentLoaded', function() {
     // Set initial audio toggle state

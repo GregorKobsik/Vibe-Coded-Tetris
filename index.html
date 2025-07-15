@@ -3,91 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tetris - Vibe Coded</title>
+    <title>Region Tetris - Vibe Coded</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <div class="game-container">
         <div class="header">
-            <h1>TETRIS</h1>
+            <h1>REGION TETRIS</h1>
         </div>
         
         <div class="game-area">
             <div class="sidebar left">
-                <div class="info-panel">
-                    <h3>Hold</h3>
-                    <canvas id="holdPiece" width="120" height="120"></canvas>
-                </div>
-                
-                <div class="info-panel">
-                    <div class="game-controls">
-                        <button id="pauseButton" class="game-button" disabled>Pause</button>
-                        <button id="resetButton" class="game-button">Reset</button>
-                    </div>
-                </div>
-                
-                <div class="info-panel expandable-panel">
-                    <h3 class="panel-header" onclick="togglePanel('controls-panel')">
-                        Controls 
-                        <span class="toggle-icon collapsed" id="controls-toggle">▶</span>
-                    </h3>
-                    <div class="controls panel-content collapsed" id="controls-panel">
-                        <div class="toggle-section">
-                            <div class="toggle-row">
-                                <span>Audio</span>
-                                <div class="toggle-switch" id="audioToggle" onclick="toggleAudio()">
-                                    <div class="toggle-slider"></div>
-                                </div>
-                            </div>
-                            <div class="toggle-row">
-                                <span id="themeText">Dark Mode</span>
-                                <div class="toggle-switch" id="themeToggle" onclick="toggleTheme()">
-                                    <div class="toggle-slider"></div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="game-board-container">
-                <canvas id="gameBoard" width="300" height="600"></canvas>
-                <canvas id="particleCanvas" width="300" height="600"></canvas>
-                <div id="gameOverlay" class="game-overlay hidden">
-                    <div class="overlay-content">
-                        <h2 id="overlayTitle">Game Over</h2>
-                        <p id="overlayMessage">Press SPACE to start a new game</p>
-                    </div>
-                </div>
-                <div id="infoOverlay" class="game-overlay">
-                    <div class="overlay-content info-content">
-                        <div class="info-text">
-                            <p><strong>Game Rules:</strong></p>
-                            <p>• Complete 5 levels</p>
-                            <p>• Each level ends when the board is completely full</p>
-                            <p>• Completed rows stay on the board and award points</p>
-                            <br>
-                            <p><strong>Scoring System:</strong></p>
-                            <p>• Single row: 10 points</p>
-                            <p>• Double rows: 60 points</p>
-                            <p>• Triple rows: 120 points</p>
-                            <p>• Tetris (4+ rows): 200 points</p>
-                            <p>• Level bonus: Largest connected regions × 20 × level</p>
-                            <br>
-                            <p><strong>Controls:</strong> Arrow keys to move, C to hold, Space to hard drop, P to pause</p>
-                        </div>
-                        <button id="startInfoButton" class="info-button">Start Game</button>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="sidebar right">
-                <div class="info-panel">
-                    <h3>Next</h3>
-                    <canvas id="nextPiece1" width="100" height="80"></canvas>
-                    <canvas id="nextPiece2" width="80" height="60"></canvas>
-                    <canvas id="nextPiece3" width="60" height="50"></canvas>
-                </div>
                 <div class="info-panel">
                     <h3>Statistics</h3>
                     <div class="stats">
@@ -112,6 +38,94 @@
                             <span id="piecesPerSecond" class="stat-value">0.0</span>
                         </div>
                     </div>
+                </div>
+                
+                <div class="info-panel">
+                    <h3>Controls</h3>
+                    <div class="game-controls">
+                        <div class="toggle-section">
+                            <div class="toggle-row">
+                                <span>Audio</span>
+                                <div class="toggle-switch" id="audioToggle" onclick="toggleAudio()">
+                                    <div class="toggle-slider"></div>
+                                </div>
+                            </div>
+                            <div class="toggle-row">
+                                <span id="themeText">Dark Mode</span>
+                                <div class="toggle-switch" id="themeToggle" onclick="toggleTheme()">
+                                    <div class="toggle-slider"></div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="button-section">
+                            <button id="pauseButton" class="game-button" disabled>Pause</button>
+                            <button id="resetButton" class="game-button">Reset</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="game-board-container">
+                <canvas id="gameBoard" width="300" height="600"></canvas>
+                <canvas id="particleCanvas" width="300" height="600"></canvas>
+                <div id="gameOverlay" class="game-overlay hidden">
+                    <div class="overlay-content">
+                        <h2 id="overlayTitle">Game Over</h2>
+                        <p id="overlayMessage">Press SPACE to start a new game</p>
+                    </div>
+                </div>
+                <div id="infoOverlay" class="game-overlay">
+                    <div class="overlay-content info-content">
+                        <div class="info-text">
+                            <p><strong>Game Rules:</strong></p>
+                            <p>• Each level ends when the board is completely full</p>
+                            <p>• Completed rows stay on the board</p>
+                            <br>
+                            <p><strong>Scoring System:</strong></p>
+                            <p>• Row bonus: gain points for fully completed rows</p>
+                            <p>• Region bonus: Largest connected region of each color grants bonus points</p>
+                            <br>
+                            <p><strong>Controls:</strong></p>
+                            <div class="controls-display">
+                                <div class="control-group">
+                                    <span class="control-desc">Move & Rotate</span>
+                                    <div class="key-boxes">
+                                        <span class="key-box">←</span>
+                                        <span class="key-box">↓</span>
+                                        <span class="key-box">→</span>
+                                        <span class="key-box">↑</span>
+                                    </div>
+                                </div>
+                                <div class="control-group">
+                                    <span class="control-desc">Hold</span>
+                                    <span class="key-box">C</span>
+                                </div>
+                                <div class="control-group">
+                                    <span class="control-desc">Hard Drop</span>
+                                    <span class="key-box">Space</span>
+                                </div>
+                                <div class="control-group">
+                                    <span class="control-desc">Pause</span>
+                                    <span class="key-box">P</span>
+                                </div>
+                            </div>
+                        </div>
+                        <button id="startInfoButton" class="info-button">Start Game</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="sidebar right">
+                <div class="info-panel">
+                    <h3>Hold</h3>
+                    <canvas id="holdPiece" width="120" height="120"></canvas>
+                </div>
+                <div class="info-panel">
+                    <h3>Next</h3>
+                    <canvas id="nextPiece1" width="100" height="80"></canvas>
+                    <canvas id="nextPiece2" width="80" height="60"></canvas>
+                    <canvas id="nextPiece3" width="60" height="50"></canvas>
                 </div>
             </div>
         </div>

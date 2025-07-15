@@ -284,6 +284,22 @@ kbd {
     padding-top: 0;
 }
 
+/* Add spacing and separator when button-section is inside game-controls */
+.game-controls .button-section {
+    margin-top: 5px;
+    padding-top: 15px;
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Add spacing between buttons in button-section */
+.game-controls .button-section .game-button {
+    margin-bottom: 10px;
+}
+
+.game-controls .button-section .game-button:last-child {
+    margin-bottom: 0;
+}
+
 .toggle-row {
     display: flex;
     justify-content: space-between;
@@ -396,6 +412,11 @@ body.light-mode .toggle-section {
     border-top: none;
 }
 
+/* Light mode separator for button-section inside game-controls */
+body.light-mode .game-controls .button-section {
+    border-top: 1px solid rgba(0, 0, 0, 0.15);
+}
+
 body.light-mode .game-button {
     background: linear-gradient(45deg, #3498db, #2980b9);
     color: white;
@@ -456,6 +477,65 @@ body.light-mode kbd {
     margin: 5px 0;
     font-size: 0.95rem;
     line-height: 1.4;
+}
+
+/* Controls display styles */
+.controls-display {
+    margin-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.control-group {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 26px;
+}
+
+.control-desc {
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.9);
+    flex: 1;
+    text-align: left;
+}
+
+.key-boxes {
+    display: flex;
+    gap: 3px;
+    flex-shrink: 0;
+    min-width: 100px;
+    justify-content: flex-end;
+}
+
+.key-box {
+    display: inline-block;
+    min-width: 22px;
+    height: 22px;
+    padding: 1px 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-align: center;
+    line-height: 20px;
+    backdrop-filter: blur(5px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Light mode key box styles */
+body.light-mode .key-box {
+    background: rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(0, 0, 0, 0.2);
+    color: #2c3e50;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+body.light-mode .control-desc {
+    color: rgba(0, 0, 0, 0.8);
 }
 
 .info-button {
@@ -551,4 +631,15 @@ body.light-mode kbd {
 
 .piece-drop {
     animation: pieceDrop 0.2s ease-out;
+}
+
+/* Single key controls alignment */
+.control-group .key-box:only-child {
+    margin-left: auto;
+}
+
+/* Ensure consistent spacing between description and keys */
+.control-group .control-desc + .key-box,
+.control-group .control-desc + .key-boxes {
+    margin-left: auto;
 }
