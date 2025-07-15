@@ -32,7 +32,6 @@ class TetrisGame {
         
         // Audio setup
         this.audioContext = null;
-        this.backgroundMusic = null;
         this.initAudio();
         
         // Game dimensions
@@ -249,9 +248,6 @@ class TetrisGame {
         // Play start sound
         this.playSound(523, 0.2, 'triangle', 0.2); // C5 note
         
-        // Start background music
-        this.startBackgroundMusic();
-        
         // Now show the next pieces since game is starting
         this.renderAllNextPieces();
         
@@ -283,9 +279,6 @@ class TetrisGame {
         this.piecesDropped = 0;
         this.dropInterval = 1000;
         this.canHold = true;
-        
-        // Stop background music
-        this.stopBackgroundMusic();
         
         // Clear board
         this.board = Array(this.BOARD_HEIGHT).fill().map(() => Array(this.BOARD_WIDTH).fill(0));
@@ -625,8 +618,9 @@ class TetrisGame {
     }
     
     render() {
-        // Clear canvas
-        this.ctx.fillStyle = '#000000';
+        // Clear canvas with appropriate background color
+        const isLightMode = document.body.classList.contains('light-mode');
+        this.ctx.fillStyle = isLightMode ? '#e8e8e8' : '#000000';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
         
         // Draw board
@@ -658,23 +652,24 @@ class TetrisGame {
     drawBlock(ctx, x, y, color) {
         const pixelX = x * this.BLOCK_SIZE;
         const pixelY = y * this.BLOCK_SIZE;
+        const isLightMode = document.body.classList.contains('light-mode');
         
         // Main block
         ctx.fillStyle = color;
         ctx.fillRect(pixelX, pixelY, this.BLOCK_SIZE, this.BLOCK_SIZE);
         
-        // Highlight effect
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+        // Highlight effect - adjust for light mode
+        ctx.fillStyle = isLightMode ? 'rgba(255, 255, 255, 0.6)' : 'rgba(255, 255, 255, 0.3)';
         ctx.fillRect(pixelX, pixelY, this.BLOCK_SIZE, 2);
         ctx.fillRect(pixelX, pixelY, 2, this.BLOCK_SIZE);
         
-        // Shadow effect
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+        // Shadow effect - adjust for light mode
+        ctx.fillStyle = isLightMode ? 'rgba(0, 0, 0, 0.5)' : 'rgba(0, 0, 0, 0.3)';
         ctx.fillRect(pixelX, pixelY + this.BLOCK_SIZE - 2, this.BLOCK_SIZE, 2);
         ctx.fillRect(pixelX + this.BLOCK_SIZE - 2, pixelY, 2, this.BLOCK_SIZE);
         
-        // Border
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+        // Border - use middle gray for light mode, light for dark mode
+        ctx.strokeStyle = isLightMode ? 'rgba(128, 128, 128, 0.6)' : 'rgba(255, 255, 255, 0.1)';
         ctx.lineWidth = 1;
         ctx.strokeRect(pixelX, pixelY, this.BLOCK_SIZE, this.BLOCK_SIZE);
     }
@@ -692,22 +687,27 @@ class TetrisGame {
     drawGhostPiece() {
         if (!this.currentPiece) return;
         
+        const isLightMode = document.body.classList.contains('light-mode');
+        
         // Calculate ghost position
         let ghostY = this.currentPiece.y;
         while (!this.isColliding(this.currentPiece, 0, ghostY - this.currentPiece.y + 1)) {
             ghostY++;
         }
         
-        // Draw ghost piece
+        // Draw ghost piece with appropriate colors for light/dark mode
         for (let y = 0; y < this.currentPiece.shape.length; y++) {
             for (let x = 0; x < this.currentPiece.shape[y].length; x++) {
                 if (this.currentPiece.shape[y][x]) {
                     const pixelX = (this.currentPiece.x + x) * this.BLOCK_SIZE;
                     const pixelY = (ghostY + y) * this.BLOCK_SIZE;
                     
-                    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+                    // Fill with appropriate transparency for light/dark mode
+                    this.ctx.fillStyle = isLightMode ? 'rgba(128, 128, 128, 0.2)' : 'rgba(255, 255, 255, 0.1)';
                     this.ctx.fillRect(pixelX, pixelY, this.BLOCK_SIZE, this.BLOCK_SIZE);
-                    this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+                    
+                    // Border with appropriate color for light/dark mode
+                    this.ctx.strokeStyle = isLightMode ? 'rgba(128, 128, 128, 0.5)' : 'rgba(255, 255, 255, 0.3)';
                     this.ctx.lineWidth = 1;
                     this.ctx.strokeRect(pixelX, pixelY, this.BLOCK_SIZE, this.BLOCK_SIZE);
                 }
@@ -716,7 +716,8 @@ class TetrisGame {
     }
     
     drawGrid() {
-        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+        const isLightMode = document.body.classList.contains('light-mode');
+        this.ctx.strokeStyle = isLightMode ? 'rgba(128, 128, 128, 0.2)' : 'rgba(255, 255, 255, 0.05)';
         this.ctx.lineWidth = 1;
         
         // Vertical lines
@@ -750,10 +751,13 @@ class TetrisGame {
     }
     
     clearNextPiecesDisplay() {
-        // Clear all next piece canvases
+        // Clear all next piece canvases with appropriate background color
+        const isLightMode = document.body.classList.contains('light-mode');
+        const bgColor = isLightMode ? '#e8e8e8' : '#000000';
+        
         for (let i = 0; i < 3; i++) {
             if (this.nextCanvases[i] && this.nextCanvases[i].ctx && this.nextCanvases[i].canvas) {
-                this.nextCanvases[i].ctx.fillStyle = '#000000';
+                this.nextCanvases[i].ctx.fillStyle = bgColor;
                 this.nextCanvases[i].ctx.fillRect(0, 0, this.nextCanvases[i].canvas.width, this.nextCanvases[i].canvas.height);
             }
         }
@@ -765,8 +769,9 @@ class TetrisGame {
         if (this.holdPiece) {
             this.renderPieceOnCanvas(this.holdCtx, this.holdCanvas, this.holdPiece, 18);
         } else {
-            // Clear canvas if no hold piece
-            this.holdCtx.fillStyle = '#000000';
+            // Clear canvas if no hold piece with appropriate background color
+            const isLightMode = document.body.classList.contains('light-mode');
+            this.holdCtx.fillStyle = isLightMode ? '#e8e8e8' : '#000000';
             this.holdCtx.fillRect(0, 0, this.holdCanvas.width, this.holdCanvas.height);
         }
     }
@@ -774,8 +779,9 @@ class TetrisGame {
     renderPieceOnCanvas(ctx, canvas, piece, blockSize) {
         if (!piece) return;
         
-        // Clear canvas
-        ctx.fillStyle = '#000000';
+        // Clear canvas with appropriate background color
+        const isLightMode = document.body.classList.contains('light-mode');
+        ctx.fillStyle = isLightMode ? '#e8e8e8' : '#000000';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
         // Center the piece in the canvas
@@ -792,13 +798,13 @@ class TetrisGame {
                     ctx.fillStyle = piece.color;
                     ctx.fillRect(pixelX, pixelY, blockSize, blockSize);
                     
-                    // Highlight
-                    ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+                    // Highlight - adjust for light mode
+                    ctx.fillStyle = isLightMode ? 'rgba(255, 255, 255, 0.6)' : 'rgba(255, 255, 255, 0.3)';
                     ctx.fillRect(pixelX, pixelY, blockSize, 2);
                     ctx.fillRect(pixelX, pixelY, 2, blockSize);
                     
-                    // Border
-                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+                    // Border - use middle gray for light mode, light for dark mode
+                    ctx.strokeStyle = isLightMode ? 'rgba(128, 128, 128, 0.6)' : 'rgba(255, 255, 255, 0.1)';
                     ctx.lineWidth = 1;
                     ctx.strokeRect(pixelX, pixelY, blockSize, blockSize);
                 }
@@ -814,110 +820,9 @@ class TetrisGame {
             console.warn('Web Audio API not supported');
         }
     }
-    
-    // LoFi Background Music System
-    startBackgroundMusic() {
-        if (!this.audioContext) return;
-        
-        this.stopBackgroundMusic(); // Stop any existing music
-        
-        // Create nodes for the lofi effect
-        this.musicGain = this.audioContext.createGain();
-        this.musicGain.gain.setValueAtTime(0.15, this.audioContext.currentTime);
-        this.musicGain.connect(this.audioContext.destination);
-        
-        // Create a simple lofi chord progression
-        this.startLofiLoop();
-    }
-    
-    startLofiLoop() {
-        if (!this.audioContext || !this.musicGain) return;
-        
-        // Simple lofi chord progression in C minor
-        const chords = [
-            [261.63, 311.13, 369.99], // C minor (C-Eb-G)
-            [246.94, 293.66, 349.23], // B diminished (B-D-F)
-            [220.00, 261.63, 311.13], // A minor (A-C-E)
-            [293.66, 349.23, 415.30]  // D minor (D-F-A)
-        ];
-        
-        let chordIndex = 0;
-        const chordDuration = 4; // 4 seconds per chord
-        
-        const playChord = () => {
-            if (!this.audioContext || !this.musicGain) return;
-            
-            const chord = chords[chordIndex];
-            const oscillators = [];
-            
-            // Create oscillators for each note in the chord
-            chord.forEach((frequency, i) => {
-                const osc = this.audioContext.createOscillator();
-                const gain = this.audioContext.createGain();
-                
-                // Different waveforms for lofi texture
-                osc.type = i === 0 ? 'triangle' : (i === 1 ? 'sine' : 'sawtooth');
-                osc.frequency.setValueAtTime(frequency, this.audioContext.currentTime);
-                
-                // Soft attack and release for lofi feel
-                gain.gain.setValueAtTime(0, this.audioContext.currentTime);
-                gain.gain.linearRampToValueAtTime(0.03 + i * 0.01, this.audioContext.currentTime + 0.1);
-                gain.gain.setValueAtTime(0.03 + i * 0.01, this.audioContext.currentTime + chordDuration - 0.5);
-                gain.gain.exponentialRampToValueAtTime(0.001, this.audioContext.currentTime + chordDuration);
-                
-                osc.connect(gain);
-                gain.connect(this.musicGain);
-                
-                osc.start(this.audioContext.currentTime);
-                osc.stop(this.audioContext.currentTime + chordDuration);
-                
-                oscillators.push(osc);
-            });
-            
-            // Add some subtle arpeggiation
-            setTimeout(() => {
-                if (!this.audioContext || !this.musicGain) return;
-                
-                const arpNote = this.audioContext.createOscillator();
-                const arpGain = this.audioContext.createGain();
-                
-                arpNote.type = 'sine';
-                arpNote.frequency.setValueAtTime(chord[0] * 2, this.audioContext.currentTime); // Octave higher
-                
-                arpGain.gain.setValueAtTime(0, this.audioContext.currentTime);
-                arpGain.gain.linearRampToValueAtTime(0.02, this.audioContext.currentTime + 0.05);
-                arpGain.gain.exponentialRampToValueAtTime(0.001, this.audioContext.currentTime + 1);
-                
-                arpNote.connect(arpGain);
-                arpGain.connect(this.musicGain);
-                
-                arpNote.start(this.audioContext.currentTime);
-                arpNote.stop(this.audioContext.currentTime + 1);
-                
-            }, Math.random() * 2000 + 1000); // Random timing for lofi feel
-            
-            chordIndex = (chordIndex + 1) % chords.length;
-        };
-        
-        // Start the loop
-        playChord();
-        this.musicInterval = setInterval(playChord, chordDuration * 1000);
-    }
-    
-    stopBackgroundMusic() {
-        if (this.musicInterval) {
-            clearInterval(this.musicInterval);
-            this.musicInterval = null;
-        }
-        
-        if (this.musicGain) {
-            this.musicGain.disconnect();
-            this.musicGain = null;
-        }
-    }
-    
+
     playSound(frequency, duration = 0.1, type = 'sine', volume = 0.3) {
-        if (!this.audioContext) return;
+        if (!this.audioContext || !window.audioEnabled) return;
         
         const oscillator = this.audioContext.createOscillator();
         const gainNode = this.audioContext.createGain();
@@ -988,9 +893,6 @@ class TetrisGame {
         this.gameOver = true;
         this.gameRunning = false;
         
-        // Stop background music
-        this.stopBackgroundMusic();
-        
         // Clear next pieces display when game ends
         this.clearNextPiecesDisplay();
         
@@ -1009,13 +911,81 @@ document.addEventListener('DOMContentLoaded', () => {
     window.tetrisGame = new TetrisGame();
 });
 
-// Expandable Panel Functionality
-function togglePanel(panelId) {
-    const panel = document.getElementById(panelId);
-    const toggleIcon = document.getElementById(panelId.replace('-panel', '-toggle'));
+// Audio Toggle Functionality
+window.audioEnabled = true;
+
+function toggleAudio() {
+    const audioToggle = document.getElementById('audioToggle');
+    window.audioEnabled = !window.audioEnabled;
     
-    if (panel && toggleIcon) {
-        panel.classList.toggle('collapsed');
-        toggleIcon.classList.toggle('collapsed');
+    if (window.audioEnabled) {
+        audioToggle.classList.add('active');
+    } else {
+        audioToggle.classList.remove('active');
     }
 }
+
+// Theme Toggle Functionality
+function toggleTheme() {
+    const themeToggle = document.getElementById('themeToggle');
+    const themeText = document.getElementById('themeText');
+    const body = document.body;
+    
+    if (body.classList.contains('light-mode')) {
+        body.classList.remove('light-mode');
+        themeToggle.classList.remove('active');
+        themeText.textContent = 'Dark Mode';
+    } else {
+        body.classList.add('light-mode');
+        themeToggle.classList.add('active');
+        themeText.textContent = 'Light Mode';
+    }
+    
+    // Refresh canvas backgrounds when theme changes
+    if (window.tetrisGame) {
+        // Re-render the main game board
+        window.tetrisGame.render();
+        
+        // Re-render hold piece
+        window.tetrisGame.renderHoldPiece();
+        
+        // Re-render next pieces if game is running
+        if (window.tetrisGame.gameRunning) {
+            window.tetrisGame.renderAllNextPieces();
+        } else {
+            // Clear next pieces display with new theme colors
+            window.tetrisGame.clearNextPiecesDisplay();
+        }
+    }
+}
+
+// Panel Toggle Functionality
+function togglePanel(panelId) {
+    const panel = document.getElementById(panelId);
+    const toggleIcon = document.getElementById('controls-toggle');
+    
+    if (panel && toggleIcon) {
+        if (panel.classList.contains('collapsed')) {
+            panel.classList.remove('collapsed');
+            toggleIcon.classList.remove('collapsed');
+            toggleIcon.textContent = '▼';
+        } else {
+            panel.classList.add('collapsed');
+            toggleIcon.classList.add('collapsed');
+            toggleIcon.textContent = '▶';
+        }
+    }
+}
+
+// Initialize toggles on page load
+document.addEventListener('DOMContentLoaded', function() {
+    // Set initial audio toggle state
+    const audioToggle = document.getElementById('audioToggle');
+    if (window.audioEnabled) {
+        audioToggle.classList.add('active');
+    }
+    
+    // Set initial theme toggle state (default to dark mode)
+    const themeToggle = document.getElementById('themeToggle');
+    // Keep dark mode as default, so toggle starts inactive
+});

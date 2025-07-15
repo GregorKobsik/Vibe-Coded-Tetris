@@ -30,15 +30,30 @@
                 <div class="info-panel expandable-panel">
                     <h3 class="panel-header" onclick="togglePanel('controls-panel')">
                         Controls 
-                        <span class="toggle-icon" id="controls-toggle">▼</span>
+                        <span class="toggle-icon collapsed" id="controls-toggle">▶</span>
                     </h3>
-                    <div class="controls panel-content" id="controls-panel">
+                    <div class="controls panel-content collapsed" id="controls-panel">
                         <p><kbd>←</kbd> <kbd>→</kbd> Move</p>
                         <p><kbd>↓</kbd> Soft Drop</p>
                         <p><kbd>↑</kbd> Rotate</p>
                         <p><kbd>Space</kbd> Hard Drop</p>
                         <p><kbd>C</kbd> Hold</p>
                         <p><kbd>P</kbd> Pause</p>
+                        
+                        <div class="toggle-section">
+                            <div class="toggle-row">
+                                <span>Audio</span>
+                                <div class="toggle-switch" id="audioToggle" onclick="toggleAudio()">
+                                    <div class="toggle-slider"></div>
+                                </div>
+                            </div>
+                            <div class="toggle-row">
+                                <span id="themeText">Dark Mode</span>
+                                <div class="toggle-switch" id="themeToggle" onclick="toggleTheme()">
+                                    <div class="toggle-slider"></div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

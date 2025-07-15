@@ -7,7 +7,7 @@
 
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%);
     min-height: 100vh;
     display: flex;
     justify-content: center;
@@ -164,7 +164,7 @@ kbd {
 
 #nextPiece, #holdPiece, #nextPiece1, #nextPiece2, #nextPiece3 {
     border-radius: 10px;
-    background: rgba(0, 0, 0, 0.3);
+    background: #000000;
     border: 1px solid rgba(255, 255, 255, 0.2);
     display: block;
     margin: 0 auto 10px auto;
@@ -264,6 +264,147 @@ kbd {
     border-radius: 15px;
     pointer-events: none;
     z-index: 10;
+}
+
+/* Toggle Switch Styling */
+.toggle-section {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.toggle-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    font-size: 0.9rem;
+}
+
+.toggle-row:last-child {
+    margin-bottom: 0;
+}
+
+.toggle-switch {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.toggle-switch.active {
+    background: linear-gradient(45deg, #4ecdc4, #45b7d1);
+}
+
+.toggle-slider {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 18px;
+    height: 18px;
+    background: white;
+    border-radius: 50%;
+    transition: transform 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.toggle-switch.active .toggle-slider {
+    transform: translateX(20px);
+}
+
+/* Light mode styles */
+body.light-mode {
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    color: #333;
+}
+
+body.light-mode .game-container {
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+body.light-mode .info-panel {
+    background: rgba(255, 255, 255, 0.8);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+body.light-mode .info-panel h3 {
+    color: #2c3e50;
+}
+
+body.light-mode .stat-value {
+    color: #3498db;
+}
+
+body.light-mode #gameBoard {
+    background: #e8e8e8;
+    border: 2px solid rgba(0, 0, 0, 0.2);
+}
+
+body.light-mode #nextPiece, 
+body.light-mode #holdPiece, 
+body.light-mode #nextPiece1, 
+body.light-mode #nextPiece2, 
+body.light-mode #nextPiece3 {
+    background: #e8e8e8;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+body.light-mode .game-overlay {
+    background: rgba(255, 255, 255, 0.9);
+}
+
+body.light-mode .overlay-content {
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    color: #333;
+}
+
+body.light-mode .overlay-content h2 {
+    color: #e74c3c;
+}
+
+body.light-mode .toggle-switch {
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(0, 0, 0, 0.3);
+}
+
+body.light-mode .stat-row {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+body.light-mode .toggle-section {
+    border-top: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+body.light-mode .game-button {
+    background: linear-gradient(45deg, #3498db, #2980b9);
+    color: white;
+    border: 2px solid rgba(0, 0, 0, 0.2);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+body.light-mode .game-button:hover:not(:disabled) {
+    background: linear-gradient(45deg, #2980b9, #3498db);
+    border: 2px solid rgba(0, 0, 0, 0.3);
+    box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+}
+
+body.light-mode .game-button:disabled {
+    background: linear-gradient(45deg, #95a5a6, #7f8c8d);
+    border: 2px solid rgba(0, 0, 0, 0.1);
+    opacity: 0.6;
+}
+
+body.light-mode kbd {
+    background: rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(0, 0, 0, 0.2);
+    color: #2c3e50;
 }
 
 /* Responsive Design */
