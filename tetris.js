@@ -64,6 +64,8 @@ class TetrisGame {
         this.level = 1;
         this.linesCleared = 0;
         this.startTime = null;
+        this.pausedTime = 0; // Track total time spent paused
+        this.pauseStartTime = null; // Track when current pause started
         this.piecesDropped = 0;
         
         // Track scoring per level
@@ -285,8 +287,15 @@ class TetrisGame {
         document.getElementById('pauseButton').textContent = this.paused ? 'Resume' : 'Pause';
         
         if (this.paused) {
+            // Start tracking pause time
+            this.pauseStartTime = Date.now();
             this.showOverlay('Paused', 'Press P to resume');
         } else {
+            // Add pause duration to total paused time
+            if (this.pauseStartTime) {
+                this.pausedTime += Date.now() - this.pauseStartTime;
+                this.pauseStartTime = null;
+            }
             document.getElementById('gameOverlay').classList.add('hidden');
             this.gameLoop();
         }
@@ -303,6 +312,8 @@ class TetrisGame {
         this.piecesDropped = 0;
         this.dropInterval = 1000;
         this.canHold = true;
+        this.pausedTime = 0; // Reset paused time tracking
+        this.pauseStartTime = null;
         
         // Reset level tracking
         this.levelScores = Array(5).fill(0);
@@ -625,6 +636,9 @@ class TetrisGame {
         const levelIndex = this.level - 1; // Convert to 0-based index
         this.levelScores[levelIndex] = this.levelRowPoints + regionBonus;
         
+        // Store row points before resetting for overlay display
+        const currentLevelRowPoints = this.levelRowPoints;
+        
         // Level completed when board is full
         this.level++;
         
@@ -636,7 +650,7 @@ class TetrisGame {
         
         // Start the region animation if there are regions to highlight
         if (regionData.regions.length > 0) {
-            this.startRegionAnimation(regionData.regions, isFinalLevel);
+            this.startRegionAnimation(regionData.regions, isFinalLevel, currentLevelRowPoints);
             // Pause the game during animation
             this.paused = true;
         } else {
@@ -644,7 +658,7 @@ class TetrisGame {
             if (isFinalLevel) {
                 this.endGame();
             } else {
-                this.showLevelCompleteOverlay(regionBonus);
+                this.showLevelCompleteOverlay(regionBonus, currentLevelRowPoints);
             }
         }
         
@@ -775,15 +789,33 @@ class TetrisGame {
     updateGameTime() {
         if (!this.startTime) return;
         
-        const elapsed = Date.now() - this.startTime;
-        const minutes = Math.floor(elapsed / 60000);
-        const seconds = Math.floor((elapsed % 60000) / 1000);
+        // If we're currently paused (level complete overlay), don't update time
+        if (this.waitingForContinue) {
+            // Start tracking pause time if not already tracking
+            if (!this.pauseStartTime) {
+                this.pauseStartTime = Date.now();
+            }
+            return;
+        }
+        
+        // If we just resumed from a pause, add the pause duration to total paused time
+        if (this.pauseStartTime) {
+            this.pausedTime += Date.now() - this.pauseStartTime;
+            this.pauseStartTime = null;
+        }
+        
+        // Calculate elapsed time excluding paused time
+        const totalElapsed = Date.now() - this.startTime;
+        const activeElapsed = totalElapsed - this.pausedTime;
+        
+        const minutes = Math.floor(activeElapsed / 60000);
+        const seconds = Math.floor((activeElapsed % 60000) / 1000);
         
         document.getElementById('gameTime').textContent = 
             `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
         
-        // Calculate pieces per second
-        const pps = this.piecesDropped / (elapsed / 1000);
+        // Calculate pieces per second using active time
+        const pps = this.piecesDropped / (activeElapsed / 1000);
         document.getElementById('piecesPerSecond').textContent = pps.toFixed(1);
     }
     
@@ -1344,8 +1376,8 @@ class TetrisGame {
         }
         
         // Calculate bonus using similar scoring to row completion
-        // Base score of 20 points per block in largest regions, scaled by level
-        const baseScore = 20;
+        // Base score of 10 points per block in largest regions, scaled by level
+        const baseScore = 10;
         let totalBonus = 0;
         
         for (let [color, largestRegion] of colorRegions) {
@@ -1385,9 +1417,9 @@ class TetrisGame {
     }
     
     // Helper function to show level complete overlay
-    showLevelCompleteOverlay(regionBonus) {
+    showLevelCompleteOverlay(regionBonus, rowPoints = 0) {
         const bonusText = regionBonus > 0 ? `Region Bonus: +${regionBonus.toLocaleString()}` : '';
-        let message = `Starting Level ${this.level}<br><br>Score: ${this.score.toLocaleString()}<br>Completed Rows: +${this.levelRowPoints}`;
+        let message = `Starting Level ${this.level}<br><br><strong>Score: ${this.score.toLocaleString()}</strong><br><br>Row Bonus: +${rowPoints.toLocaleString()}`;
         if (bonusText) {
             message += `<br>${bonusText}`;
         }
@@ -1429,7 +1461,7 @@ class TetrisGame {
         }
         
         // Calculate bonus and create region data
-        const baseScore = 20;
+        const baseScore = 10;
         let totalBonus = 0;
         const regions = [];
         
@@ -1481,11 +1513,12 @@ class TetrisGame {
     }
     
     // Start the region highlighting animation
-    startRegionAnimation(regions, isFinalLevel = false) {
+    startRegionAnimation(regions, isFinalLevel = false, rowPoints = 0) {
         this.levelAnimationActive = true;
         this.regionAnimations = [];
         this.scoreDisplays = [];
         this.isFinalLevelAnimation = isFinalLevel;
+        this.storedRowPoints = rowPoints; // Store row points for later use in overlay
         
         // Color to frequency mapping for unique sounds
         const colorSounds = {
@@ -1619,7 +1652,7 @@ class TetrisGame {
                 this.endGame();
             } else {
                 // Regular level completed - show overlay
-                this.showLevelCompleteOverlay(totalRegionBonus);
+                this.showLevelCompleteOverlay(totalRegionBonus, this.storedRowPoints);
             }
         }
     }
@@ -1951,7 +1984,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Audio Toggle Functionality
-window.audioEnabled = true;
+window.audioEnabled = false;
 
 function toggleAudio() {
     const audioToggle = document.getElementById('audioToggle');
