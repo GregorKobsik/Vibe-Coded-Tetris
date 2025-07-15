@@ -10,20 +10,6 @@
     <div class="game-container">
         <div class="header">
             <h1>TETRIS</h1>
-            <div class="score-display">
-                <div class="score-item">
-                    <span class="label">Score</span>
-                    <span id="score" class="value">0</span>
-                </div>
-                <div class="score-item">
-                    <span class="label">Level</span>
-                    <span id="level" class="value">1</span>
-                </div>
-                <div class="score-item">
-                    <span class="label">Lines</span>
-                    <span id="lines" class="value">0</span>
-                </div>
-            </div>
         </div>
         
         <div class="game-area">
@@ -32,9 +18,21 @@
                     <h3>Hold</h3>
                     <canvas id="holdPiece" width="120" height="120"></canvas>
                 </div>
+                
                 <div class="info-panel">
-                    <h3>Controls</h3>
-                    <div class="controls">
+                    <div class="game-controls">
+                        <button id="startButton" class="game-button">Start Game</button>
+                        <button id="pauseButton" class="game-button" disabled>Pause</button>
+                        <button id="resetButton" class="game-button">Reset</button>
+                    </div>
+                </div>
+                
+                <div class="info-panel expandable-panel">
+                    <h3 class="panel-header" onclick="togglePanel('controls-panel')">
+                        Controls 
+                        <span class="toggle-icon" id="controls-toggle">▼</span>
+                    </h3>
+                    <div class="controls panel-content" id="controls-panel">
                         <p><kbd>←</kbd> <kbd>→</kbd> Move</p>
                         <p><kbd>↓</kbd> Soft Drop</p>
                         <p><kbd>↑</kbd> Rotate</p>
@@ -67,22 +65,28 @@
                     <h3>Statistics</h3>
                     <div class="stats">
                         <div class="stat-row">
+                            <span>Score</span>
+                            <span id="score" class="stat-value">0</span>
+                        </div>
+                        <div class="stat-row">
+                            <span>Level</span>
+                            <span id="level" class="stat-value">1</span>
+                        </div>
+                        <div class="stat-row">
+                            <span>Lines</span>
+                            <span id="lines" class="stat-value">0</span>
+                        </div>
+                        <div class="stat-row">
                             <span>Time</span>
-                            <span id="gameTime">00:00</span>
+                            <span id="gameTime" class="stat-value">00:00</span>
                         </div>
                         <div class="stat-row">
                             <span>PPS</span>
-                            <span id="piecesPerSecond">0.0</span>
+                            <span id="piecesPerSecond" class="stat-value">0.0</span>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
-        
-        <div class="footer">
-            <button id="startButton" class="game-button">Start Game</button>
-            <button id="pauseButton" class="game-button" disabled>Pause</button>
-            <button id="resetButton" class="game-button">Reset</button>
         </div>
     </div>
     

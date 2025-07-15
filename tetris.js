@@ -167,6 +167,7 @@ class TetrisGame {
         this.setupEventListeners();
         this.generateInitialPieces();
         this.updateDisplay();
+        this.clearNextPiecesDisplay(); // Clear next pieces display initially
     }
     
     setupEventListeners() {
@@ -251,6 +252,9 @@ class TetrisGame {
         // Start background music
         this.startBackgroundMusic();
         
+        // Now show the next pieces since game is starting
+        this.renderAllNextPieces();
+        
         this.spawnPiece();
         this.gameLoop();
     }
@@ -296,15 +300,16 @@ class TetrisGame {
         
         this.updateDisplay();
         this.render();
+        this.clearNextPiecesDisplay(); // Clear next pieces when game is reset
     }
     
     generateInitialPieces() {
-        // Generate initial queue of 3 pieces
+        // Generate initial queue of 3 pieces but don't render them yet
         this.nextPieces = [];
         for (let i = 0; i < 3; i++) {
             this.nextPieces.push(this.createRandomPiece());
         }
-        this.renderAllNextPieces();
+        // Don't render next pieces initially - only when game starts
         this.renderHoldPiece();
     }
     
@@ -744,6 +749,16 @@ class TetrisGame {
         }
     }
     
+    clearNextPiecesDisplay() {
+        // Clear all next piece canvases
+        for (let i = 0; i < 3; i++) {
+            if (this.nextCanvases[i] && this.nextCanvases[i].ctx && this.nextCanvases[i].canvas) {
+                this.nextCanvases[i].ctx.fillStyle = '#000000';
+                this.nextCanvases[i].ctx.fillRect(0, 0, this.nextCanvases[i].canvas.width, this.nextCanvases[i].canvas.height);
+            }
+        }
+    }
+    
     renderHoldPiece() {
         if (!this.holdCtx || !this.holdCanvas) return;
         
@@ -976,6 +991,9 @@ class TetrisGame {
         // Stop background music
         this.stopBackgroundMusic();
         
+        // Clear next pieces display when game ends
+        this.clearNextPiecesDisplay();
+        
         // Play game over sound
         this.playSound(147, 0.5, 'sawtooth', 0.3); // D3 note
         
@@ -990,3 +1008,14 @@ class TetrisGame {
 document.addEventListener('DOMContentLoaded', () => {
     window.tetrisGame = new TetrisGame();
 });
+
+// Expandable Panel Functionality
+function togglePanel(panelId) {
+    const panel = document.getElementById(panelId);
+    const toggleIcon = document.getElementById(panelId.replace('-panel', '-toggle'));
+    
+    if (panel && toggleIcon) {
+        panel.classList.toggle('collapsed');
+        toggleIcon.classList.toggle('collapsed');
+    }
+}
