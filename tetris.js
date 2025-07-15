@@ -30,6 +30,15 @@ class TetrisGame {
         this.particleCtx = this.particleCanvas ? this.particleCanvas.getContext('2d') : null;
         this.particles = [];
         
+        // Row illumination effects
+        this.illuminationEffects = [];
+        
+        // Level completion region animation
+        this.regionAnimations = [];
+        this.scoreDisplays = [];
+        this.levelAnimationActive = false;
+        this.isFinalLevelAnimation = false;
+        
         // Audio setup
         this.audioContext = null;
         this.initAudio();
@@ -518,14 +527,6 @@ class TetrisGame {
                     
                     if (boardY >= 0) {
                         this.board[boardY][boardX] = this.currentPiece.color;
-                        
-                        // Create small particles when piece locks
-                        this.createParticles(
-                            boardX * this.BLOCK_SIZE, 
-                            boardY * this.BLOCK_SIZE, 
-                            this.currentPiece.color, 
-                            3
-                        );
                     }
                 }
             }
@@ -556,11 +557,20 @@ class TetrisGame {
         }
         
         // Check only the rows affected by the current piece placement
+        const completedRows = [];
         for (let boardY of rowsToCheck) {
             if (this.board[boardY].every(cell => cell !== 0)) {
                 newlyCompletedRows++;
+                completedRows.push(boardY);
+            }
+        }
+        
+        if (newlyCompletedRows > 0) {
+            // Create illumination effects for completed rows
+            for (let boardY of completedRows) {
+                this.createRowIllumination(boardY);
                 
-                // Create celebration particles for newly completed row
+                // Create celebration particles for completed row
                 for (let x = 0; x < this.BOARD_WIDTH; x++) {
                     this.createParticles(
                         x * this.BLOCK_SIZE, 
@@ -570,18 +580,9 @@ class TetrisGame {
                     );
                 }
             }
-        }
-        
-        if (newlyCompletedRows > 0) {
-            // Play completion sound based on number of rows
-            const frequencies = [0, 440, 523, 659, 880]; // None, single, double, triple, tetris
-            this.playSound(frequencies[newlyCompletedRows] || 880, 0.3, 'triangle', 0.25);
             
-            this.linesCleared += newlyCompletedRows;
-            
-            // Enhanced scoring system for multiple simultaneous rows
+            // Calculate row score
             let rowScore = 0;
-            
             if (newlyCompletedRows === 1) {
                 rowScore = 10; // Fixed 10 points for single row
             } else if (newlyCompletedRows === 2) {
@@ -592,6 +593,21 @@ class TetrisGame {
                 rowScore = 200; // Fixed 200 points for tetris+
             }
             
+            // Create score display for completed rows
+            if (completedRows.length > 0) {
+                // Calculate center position of completed rows
+                const centerY = completedRows.reduce((sum, row) => sum + row, 0) / completedRows.length;
+                const centerX = this.BOARD_WIDTH / 2;
+                
+                this.createRowScoreDisplay(centerX, centerY, rowScore);
+            }
+            
+            // Play completion sound based on number of rows
+            const frequencies = [0, 440, 523, 659, 880]; // None, single, double, triple, tetris
+            this.playSound(frequencies[newlyCompletedRows] || 880, 0.3, 'triangle', 0.25);
+            
+            this.linesCleared += newlyCompletedRows;
+            
             this.score += rowScore;
             this.levelRowPoints += rowScore; // Track row points for current level
             
@@ -601,7 +617,8 @@ class TetrisGame {
     
     completeLevel() {
         // Calculate bonus points for connected regions before clearing the board
-        const regionBonus = this.calculateConnectedRegionBonus();
+        const regionData = this.calculateConnectedRegionBonusWithDetails();
+        const regionBonus = regionData.totalBonus;
         this.score += regionBonus;
         
         // Store total points gained in this level (before incrementing level)
@@ -614,29 +631,25 @@ class TetrisGame {
         // Play level completion sound
         this.playSound(698, 0.4, 'triangle', 0.3);
         
-        if (this.level > 5) {
-            // Game completed after 5 levels
-            this.endGame();
-            return;
-        }
+        // Check if this is the final level (level 5 completed, now level 6)
+        const isFinalLevel = this.level > 5;
         
-        // Show level completion overlay with bonus information (keep board visible)
-        const bonusText = regionBonus > 0 ? `Region Bonus: +${regionBonus.toLocaleString()}` : '';
-        let message = `Starting Level ${this.level}<br><br>Score: ${this.score.toLocaleString()}<br>Completed Rows: +${this.levelRowPoints}`;
-        if (bonusText) {
-            message += `<br>${bonusText}`;
+        // Start the region animation if there are regions to highlight
+        if (regionData.regions.length > 0) {
+            this.startRegionAnimation(regionData.regions, isFinalLevel);
+            // Pause the game during animation
+            this.paused = true;
+        } else {
+            // No regions to animate, handle completion immediately
+            if (isFinalLevel) {
+                this.endGame();
+            } else {
+                this.showLevelCompleteOverlay(regionBonus);
+            }
         }
-        message += `<br><br>Press any key to continue`;
-        this.showOverlay(`Level ${this.level - 1} Complete!`, message);
         
         // Reset row points for next level
         this.levelRowPoints = 0;
-        
-        // Pause the game while showing level complete message
-        this.paused = true;
-        
-        // Set flag to wait for user input before continuing
-        this.waitingForContinue = true;
         
         this.updateDisplay();
         this.render();
@@ -644,26 +657,117 @@ class TetrisGame {
         this.renderAllNextPieces();
     }
 
-    gameLoop(currentTime = 0) {
-        if (!this.gameRunning || this.paused || this.gameOver) return;
+    // Row illumination effect system
+    createRowIllumination(rowIndex) {
+        this.illuminationEffects.push({
+            row: rowIndex,
+            progress: 0, // 0 to 1 - tracks the sweep from left to right
+            intensity: 1.0, // brightness that fades out
+            maxIntensity: 0.8,
+            speed: 0.15, // how fast the sweep moves (much faster - almost instant)
+            fadeSpeed: 0.015, // how fast it fades after sweeping
+            sweepComplete: false
+        });
+    }
+    
+    updateIlluminationEffects() {
+        this.illuminationEffects = this.illuminationEffects.filter(effect => {
+            // Update progress (sweep from left to right)
+            if (!effect.sweepComplete) {
+                effect.progress += effect.speed;
+                if (effect.progress >= 1.0) {
+                    effect.progress = 1.0;
+                    effect.sweepComplete = true;
+                }
+            } else {
+                // After sweep is complete, fade out
+                effect.intensity -= effect.fadeSpeed;
+            }
+            
+            // Remove effect when fully faded
+            return effect.intensity > 0;
+        });
+    }
+    
+    renderIlluminationEffects() {
+        if (!this.ctx || this.illuminationEffects.length === 0) return;
         
+        this.illuminationEffects.forEach(effect => {
+            const rowY = effect.row * this.BLOCK_SIZE;
+            const isLightMode = document.body.classList.contains('light-mode');
+            
+            // Create the sweep effect
+            if (!effect.sweepComplete) {
+                // Current position of the sweep
+                const sweepX = effect.progress * this.canvas.width;
+                const sweepWidth = 60; // Width of the bright sweep
+                
+                // Create gradient for the sweep effect
+                const gradient = this.ctx.createLinearGradient(
+                    sweepX - sweepWidth, rowY,
+                    sweepX + sweepWidth, rowY
+                );
+                
+                // Colors for the illumination sweep
+                const centerColor = isLightMode ? 
+                    `rgba(255, 255, 255, ${effect.intensity * effect.maxIntensity})` :
+                    `rgba(255, 255, 255, ${effect.intensity * effect.maxIntensity})`;
+                const edgeColor = isLightMode ?
+                    `rgba(255, 255, 255, 0)` :
+                    `rgba(255, 255, 255, 0)`;
+                
+                gradient.addColorStop(0, edgeColor);
+                gradient.addColorStop(0.5, centerColor);
+                gradient.addColorStop(1, edgeColor);
+                
+                // Draw the sweep
+                this.ctx.fillStyle = gradient;
+                this.ctx.fillRect(
+                    Math.max(0, sweepX - sweepWidth), 
+                    rowY, 
+                    Math.min(this.canvas.width, sweepWidth * 2), 
+                    this.BLOCK_SIZE
+                );
+            } else {
+                // After sweep: gentle glow effect that fades out
+                const glowIntensity = effect.intensity * 0.3;
+                const glowColor = isLightMode ?
+                    `rgba(255, 255, 255, ${glowIntensity})` :
+                    `rgba(255, 255, 255, ${glowIntensity})`;
+                
+                this.ctx.fillStyle = glowColor;
+                this.ctx.fillRect(0, rowY, this.canvas.width, this.BLOCK_SIZE);
+            }
+        });
+    }
+
+    gameLoop(currentTime = 0) {
+        // Stop the game loop only if the game is not running and no animations are active
+        if (!this.gameRunning && !this.levelAnimationActive) return;
+        
+        // Always update and render animations and time, even when paused
         const deltaTime = currentTime - this.lastTime;
         this.lastTime = currentTime;
         
-        this.dropTimer += deltaTime;
-        
-        // Drop piece if timer expired
-        if (this.dropTimer >= this.dropInterval) {
-            if (!this.movePiece(0, 1)) {
-                this.lockPiece();
-            }
-            this.dropTimer = 0;
-        }
-        
         this.updateGameTime();
         this.updateParticles();
+        this.updateIlluminationEffects();
+        this.updateRegionAnimations(); // Always update region animations
         this.render();
         this.renderParticles();
+        
+        // Only update game logic if not paused, not game over, and game is running
+        if (this.gameRunning && !this.paused && !this.gameOver) {
+            this.dropTimer += deltaTime;
+            
+            // Drop piece if timer expired
+            if (this.dropTimer >= this.dropInterval) {
+                if (!this.movePiece(0, 1)) {
+                    this.lockPiece();
+                }
+                this.dropTimer = 0;
+            }
+        }
         
         requestAnimationFrame((time) => this.gameLoop(time));
     }
@@ -704,6 +808,12 @@ class TetrisGame {
             }
         }
         
+        // Draw illumination effects (after board, before current piece)
+        this.renderIlluminationEffects();
+        
+        // Draw region animations (level completion highlights) - but not score displays yet
+        this.renderRegionHighlightsOnly();
+        
         // Draw current piece
         if (this.currentPiece) {
             this.drawPiece(this.ctx, this.currentPiece);
@@ -719,31 +829,110 @@ class TetrisGame {
         
         // Render particles
         this.renderParticles();
+        
+        // Render score displays on top of everything else
+        this.renderScoreDisplaysOnly();
     }
     
     drawBlock(ctx, x, y, color) {
         const pixelX = x * this.BLOCK_SIZE;
         const pixelY = y * this.BLOCK_SIZE;
         const isLightMode = document.body.classList.contains('light-mode');
+        const size = this.BLOCK_SIZE;
+        const radius = 4; // Corner radius for modern rounded look
         
-        // Main block
-        ctx.fillStyle = color;
-        ctx.fillRect(pixelX, pixelY, this.BLOCK_SIZE, this.BLOCK_SIZE);
+        // Apply transparency in light mode
+        if (isLightMode) {
+            ctx.globalAlpha = 0.9; // 10% transparency in light mode
+        }
         
-        // Highlight effect - adjust for light mode
-        ctx.fillStyle = isLightMode ? 'rgba(255, 255, 255, 0.6)' : 'rgba(255, 255, 255, 0.3)';
-        ctx.fillRect(pixelX, pixelY, this.BLOCK_SIZE, 2);
-        ctx.fillRect(pixelX, pixelY, 2, this.BLOCK_SIZE);
+        // Save context for clip path
+        ctx.save();
         
-        // Shadow effect - adjust for light mode
-        ctx.fillStyle = isLightMode ? 'rgba(0, 0, 0, 0.5)' : 'rgba(0, 0, 0, 0.3)';
-        ctx.fillRect(pixelX, pixelY + this.BLOCK_SIZE - 2, this.BLOCK_SIZE, 2);
-        ctx.fillRect(pixelX + this.BLOCK_SIZE - 2, pixelY, 2, this.BLOCK_SIZE);
+        // Create rounded rectangle path
+        this.drawRoundedRect(ctx, pixelX, pixelY, size, size, radius);
+        ctx.clip();
         
-        // Border - use middle gray for light mode, light for dark mode
-        ctx.strokeStyle = isLightMode ? 'rgba(128, 128, 128, 0.6)' : 'rgba(255, 255, 255, 0.1)';
+        // Create radial gradient for 3D depth effect
+        const gradient = ctx.createRadialGradient(
+            pixelX + size * 0.3, pixelY + size * 0.3, 0,
+            pixelX + size * 0.5, pixelY + size * 0.5, size * 0.8
+        );
+        
+        // Parse the hex color to create lighter and darker variants
+        const rgb = this.hexToRgb(color);
+        
+        // In dark mode, reduce saturation and brightness to make pieces less vibrant
+        let adjustedRgb = rgb;
+        if (!isLightMode) {
+            // Reduce saturation by blending with gray and reduce brightness in dark mode
+            const desaturationFactor = 0.3; // Blend 30% with gray
+            const brightnessFactor = 0.85; // Reduce brightness to 85%
+            const gray = (rgb.r + rgb.g + rgb.b) / 3;
+            
+            adjustedRgb = {
+                r: Math.round((rgb.r * (1 - desaturationFactor) + gray * desaturationFactor) * brightnessFactor),
+                g: Math.round((rgb.g * (1 - desaturationFactor) + gray * desaturationFactor) * brightnessFactor),
+                b: Math.round((rgb.b * (1 - desaturationFactor) + gray * desaturationFactor) * brightnessFactor)
+            };
+        }
+        
+        const lightVariant = `rgb(${Math.min(255, adjustedRgb.r + 40)}, ${Math.min(255, adjustedRgb.g + 40)}, ${Math.min(255, adjustedRgb.b + 40)})`;
+        const darkVariant = `rgb(${Math.max(0, adjustedRgb.r - 30)}, ${Math.max(0, adjustedRgb.g - 30)}, ${Math.max(0, adjustedRgb.b - 30)})`;
+        const baseColor = `rgb(${adjustedRgb.r}, ${adjustedRgb.g}, ${adjustedRgb.b})`;
+        
+        gradient.addColorStop(0, lightVariant);
+        gradient.addColorStop(0.6, baseColor);
+        gradient.addColorStop(1, darkVariant);
+        
+        // Fill with gradient
+        ctx.fillStyle = gradient;
+        ctx.fillRect(pixelX, pixelY, size, size);
+        
+        // Add inner glow effect
+        const innerGradient = ctx.createRadialGradient(
+            pixelX + size * 0.5, pixelY + size * 0.5, 0,
+            pixelX + size * 0.5, pixelY + size * 0.5, size * 0.4
+        );
+        innerGradient.addColorStop(0, 'rgba(255, 255, 255, 0.3)');
+        innerGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+        ctx.fillStyle = innerGradient;
+        ctx.fillRect(pixelX, pixelY, size, size);
+        
+        // Restore context to remove clip
+        ctx.restore();
+        
+        // Enhanced 3D beveled edges
+        const bevelSize = 3;
+        const highlightIntensity = isLightMode ? 0.7 : 0.4;
+        const shadowIntensity = isLightMode ? 0.6 : 0.4;
+        
+        // Top highlight bevel
+        this.drawBevelEdge(ctx, pixelX, pixelY, size, bevelSize, 'top', 
+            `rgba(255, 255, 255, ${highlightIntensity})`, radius);
+        
+        // Left highlight bevel
+        this.drawBevelEdge(ctx, pixelX, pixelY, size, bevelSize, 'left', 
+            `rgba(255, 255, 255, ${highlightIntensity * 0.8})`, radius);
+        
+        // Bottom shadow bevel
+        this.drawBevelEdge(ctx, pixelX, pixelY, size, bevelSize, 'bottom', 
+            `rgba(0, 0, 0, ${shadowIntensity})`, radius);
+        
+        // Right shadow bevel
+        this.drawBevelEdge(ctx, pixelX, pixelY, size, bevelSize, 'right', 
+            `rgba(0, 0, 0, ${shadowIntensity * 0.8})`, radius);
+        
+        // Subtle outer border for definition
+        ctx.strokeStyle = isLightMode ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.1)';
         ctx.lineWidth = 1;
-        ctx.strokeRect(pixelX, pixelY, this.BLOCK_SIZE, this.BLOCK_SIZE);
+        this.drawRoundedRect(ctx, pixelX + 0.5, pixelY + 0.5, size - 1, size - 1, radius);
+        ctx.stroke();
+        
+        // Reset global alpha if it was changed
+        if (isLightMode) {
+            ctx.globalAlpha = 1.0;
+        }
     }
     
     drawPiece(ctx, piece) {
@@ -759,32 +948,81 @@ class TetrisGame {
     drawGhostPiece() {
         if (!this.currentPiece) return;
         
-        const isLightMode = document.body.classList.contains('light-mode');
-        
         // Calculate ghost position
         let ghostY = this.currentPiece.y;
         while (!this.isColliding(this.currentPiece, 0, ghostY - this.currentPiece.y + 1)) {
             ghostY++;
         }
         
-        // Draw ghost piece with appropriate colors for light/dark mode
+        // Draw ghost piece with modern 3D style but transparent
         for (let y = 0; y < this.currentPiece.shape.length; y++) {
             for (let x = 0; x < this.currentPiece.shape[y].length; x++) {
                 if (this.currentPiece.shape[y][x]) {
-                    const pixelX = (this.currentPiece.x + x) * this.BLOCK_SIZE;
-                    const pixelY = (ghostY + y) * this.BLOCK_SIZE;
-                    
-                    // Fill with appropriate transparency for light/dark mode
-                    this.ctx.fillStyle = isLightMode ? 'rgba(128, 128, 128, 0.2)' : 'rgba(255, 255, 255, 0.1)';
-                    this.ctx.fillRect(pixelX, pixelY, this.BLOCK_SIZE, this.BLOCK_SIZE);
-                    
-                    // Border with appropriate color for light/dark mode
-                    this.ctx.strokeStyle = isLightMode ? 'rgba(128, 128, 128, 0.5)' : 'rgba(255, 255, 255, 0.3)';
-                    this.ctx.lineWidth = 1;
-                    this.ctx.strokeRect(pixelX, pixelY, this.BLOCK_SIZE, this.BLOCK_SIZE);
+                    this.drawGhostBlock(this.ctx, this.currentPiece.x + x, ghostY + y, this.currentPiece.color);
                 }
             }
         }
+    }
+    
+    drawGhostBlock(ctx, x, y, originalColor) {
+        const pixelX = x * this.BLOCK_SIZE;
+        const pixelY = y * this.BLOCK_SIZE;
+        const isLightMode = document.body.classList.contains('light-mode');
+        const size = this.BLOCK_SIZE;
+        const radius = 4; // Same radius as regular blocks
+        
+        // Save context for clip path
+        ctx.save();
+        
+        // Create rounded rectangle path
+        this.drawRoundedRect(ctx, pixelX, pixelY, size, size, radius);
+        ctx.clip();
+        
+        // Create a subtle gradient for ghost piece
+        const gradient = ctx.createRadialGradient(
+            pixelX + size * 0.3, pixelY + size * 0.3, 0,
+            pixelX + size * 0.5, pixelY + size * 0.5, size * 0.8
+        );
+        
+        // Use the original piece color but with very low opacity
+        const rgb = this.hexToRgb(originalColor);
+        
+        // In dark mode, also desaturate the ghost piece color for consistency
+        let adjustedRgb = rgb;
+        if (!isLightMode) {
+            const desaturationFactor = 0.3;
+            const brightnessFactor = 0.85;
+            const gray = (rgb.r + rgb.g + rgb.b) / 3;
+            
+            adjustedRgb = {
+                r: Math.round((rgb.r * (1 - desaturationFactor) + gray * desaturationFactor) * brightnessFactor),
+                g: Math.round((rgb.g * (1 - desaturationFactor) + gray * desaturationFactor) * brightnessFactor),
+                b: Math.round((rgb.b * (1 - desaturationFactor) + gray * desaturationFactor) * brightnessFactor)
+            };
+        }
+        
+        const ghostAlpha = isLightMode ? 0.15 : 0.12;
+        const lightGhost = `rgba(${adjustedRgb.r}, ${adjustedRgb.g}, ${adjustedRgb.b}, ${ghostAlpha * 1.3})`;
+        const darkGhost = `rgba(${adjustedRgb.r}, ${adjustedRgb.g}, ${adjustedRgb.b}, ${ghostAlpha * 0.7})`;
+        
+        gradient.addColorStop(0, lightGhost);
+        gradient.addColorStop(0.6, `rgba(${adjustedRgb.r}, ${adjustedRgb.g}, ${adjustedRgb.b}, ${ghostAlpha})`);
+        gradient.addColorStop(1, darkGhost);
+        
+        // Fill with gradient
+        ctx.fillStyle = gradient;
+        ctx.fillRect(pixelX, pixelY, size, size);
+        
+        // Restore context to remove clip
+        ctx.restore();
+        
+        // Subtle border for definition
+        ctx.strokeStyle = isLightMode ? 
+            `rgba(${adjustedRgb.r}, ${adjustedRgb.g}, ${adjustedRgb.b}, 0.4)` : 
+            `rgba(${adjustedRgb.r}, ${adjustedRgb.g}, ${adjustedRgb.b}, 0.3)`;
+        ctx.lineWidth = 1;
+        this.drawRoundedRect(ctx, pixelX + 0.5, pixelY + 0.5, size - 1, size - 1, radius);
+        ctx.stroke();
     }
     
     drawGrid() {
@@ -863,24 +1101,102 @@ class TetrisGame {
         for (let y = 0; y < piece.shape.length; y++) {
             for (let x = 0; x < piece.shape[y].length; x++) {
                 if (piece.shape[y][x]) {
-                    const pixelX = startX + x * blockSize;
-                    const pixelY = startY + y * blockSize;
-                    
-                    // Main block
-                    ctx.fillStyle = piece.color;
-                    ctx.fillRect(pixelX, pixelY, blockSize, blockSize);
-                    
-                    // Highlight - adjust for light mode
-                    ctx.fillStyle = isLightMode ? 'rgba(255, 255, 255, 0.6)' : 'rgba(255, 255, 255, 0.3)';
-                    ctx.fillRect(pixelX, pixelY, blockSize, 2);
-                    ctx.fillRect(pixelX, pixelY, 2, blockSize);
-                    
-                    // Border - use middle gray for light mode, light for dark mode
-                    ctx.strokeStyle = isLightMode ? 'rgba(128, 128, 128, 0.6)' : 'rgba(255, 255, 255, 0.1)';
-                    ctx.lineWidth = 1;
-                    ctx.strokeRect(pixelX, pixelY, blockSize, blockSize);
+                    this.drawPreviewBlock(ctx, startX + x * blockSize, startY + y * blockSize, piece.color, blockSize);
                 }
             }
+        }
+    }
+    
+    // Specialized function for drawing blocks in preview panels with 3D effect
+    drawPreviewBlock(ctx, pixelX, pixelY, color, blockSize) {
+        const isLightMode = document.body.classList.contains('light-mode');
+        const radius = Math.max(2, blockSize * 0.15); // Scale radius with block size
+        
+        // Apply transparency in light mode
+        if (isLightMode) {
+            ctx.globalAlpha = 0.9; // 10% transparency in light mode
+        }
+        
+        // Save context for clip path
+        ctx.save();
+        
+        // Create rounded rectangle path
+        this.drawRoundedRect(ctx, pixelX, pixelY, blockSize, blockSize, radius);
+        ctx.clip();
+        
+        // Create radial gradient for 3D depth effect
+        const gradient = ctx.createRadialGradient(
+            pixelX + blockSize * 0.3, pixelY + blockSize * 0.3, 0,
+            pixelX + blockSize * 0.5, pixelY + blockSize * 0.5, blockSize * 0.8
+        );
+        
+        // Parse the hex color to create lighter and darker variants
+        const rgb = this.hexToRgb(color);
+        
+        // In dark mode, reduce saturation and brightness to make pieces less vibrant
+        let adjustedRgb = rgb;
+        if (!isLightMode) {
+            // Reduce saturation by blending with gray and reduce brightness in dark mode
+            const desaturationFactor = 0.3; // Blend 30% with gray
+            const brightnessFactor = 0.85; // Reduce brightness to 85%
+            const gray = (rgb.r + rgb.g + rgb.b) / 3;
+            
+            adjustedRgb = {
+                r: Math.round((rgb.r * (1 - desaturationFactor) + gray * desaturationFactor) * brightnessFactor),
+                g: Math.round((rgb.g * (1 - desaturationFactor) + gray * desaturationFactor) * brightnessFactor),
+                b: Math.round((rgb.b * (1 - desaturationFactor) + gray * desaturationFactor) * brightnessFactor)
+            };
+        }
+        
+        const lightVariant = `rgb(${Math.min(255, adjustedRgb.r + 40)}, ${Math.min(255, adjustedRgb.g + 40)}, ${Math.min(255, adjustedRgb.b + 40)})`;
+        const darkVariant = `rgb(${Math.max(0, adjustedRgb.r - 30)}, ${Math.max(0, adjustedRgb.g - 30)}, ${Math.max(0, adjustedRgb.b - 30)})`;
+        const baseColor = `rgb(${adjustedRgb.r}, ${adjustedRgb.g}, ${adjustedRgb.b})`;
+        
+        gradient.addColorStop(0, lightVariant);
+        gradient.addColorStop(0.6, baseColor);
+        gradient.addColorStop(1, darkVariant);
+        
+        // Fill with gradient
+        ctx.fillStyle = gradient;
+        ctx.fillRect(pixelX, pixelY, blockSize, blockSize);
+        
+        // Add inner glow effect (scaled for preview)
+        const innerGradient = ctx.createRadialGradient(
+            pixelX + blockSize * 0.5, pixelY + blockSize * 0.5, 0,
+            pixelX + blockSize * 0.5, pixelY + blockSize * 0.5, blockSize * 0.4
+        );
+        innerGradient.addColorStop(0, 'rgba(255, 255, 255, 0.25)');
+        innerGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+        ctx.fillStyle = innerGradient;
+        ctx.fillRect(pixelX, pixelY, blockSize, blockSize);
+        
+        // Restore context to remove clip
+        ctx.restore();
+        
+        // Simplified bevels for smaller preview blocks
+        const bevelSize = Math.max(1, Math.floor(blockSize * 0.1));
+        const highlightIntensity = isLightMode ? 0.6 : 0.3;
+        const shadowIntensity = isLightMode ? 0.5 : 0.3;
+        
+        // Top and left highlights
+        ctx.fillStyle = `rgba(255, 255, 255, ${highlightIntensity})`;
+        ctx.fillRect(pixelX, pixelY, blockSize, bevelSize); // Top
+        ctx.fillRect(pixelX, pixelY, bevelSize, blockSize); // Left
+        
+        // Bottom and right shadows
+        ctx.fillStyle = `rgba(0, 0, 0, ${shadowIntensity})`;
+        ctx.fillRect(pixelX, pixelY + blockSize - bevelSize, blockSize, bevelSize); // Bottom
+        ctx.fillRect(pixelX + blockSize - bevelSize, pixelY, bevelSize, blockSize); // Right
+        
+        // Subtle outer border
+        ctx.strokeStyle = isLightMode ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.1)';
+        ctx.lineWidth = 1;
+        this.drawRoundedRect(ctx, pixelX + 0.5, pixelY + 0.5, blockSize - 1, blockSize - 1, radius);
+        ctx.stroke();
+        
+        // Reset global alpha if it was changed
+        if (isLightMode) {
+            ctx.globalAlpha = 1.0;
         }
     }
     
@@ -1066,6 +1382,566 @@ class TetrisGame {
         }
         
         return regionSize;
+    }
+    
+    // Helper function to show level complete overlay
+    showLevelCompleteOverlay(regionBonus) {
+        const bonusText = regionBonus > 0 ? `Region Bonus: +${regionBonus.toLocaleString()}` : '';
+        let message = `Starting Level ${this.level}<br><br>Score: ${this.score.toLocaleString()}<br>Completed Rows: +${this.levelRowPoints}`;
+        if (bonusText) {
+            message += `<br>${bonusText}`;
+        }
+        message += `<br><br>Press any key to continue`;
+        this.showOverlay(`Level ${this.level - 1} Complete!`, message);
+        
+        // Pause the game while showing level complete message
+        this.paused = true;
+        
+        // Set flag to wait for user input before continuing
+        this.waitingForContinue = true;
+    }
+    
+    // Enhanced region calculation that returns detailed region data
+    calculateConnectedRegionBonusWithDetails() {
+        const colorRegions = new Map();
+        const visited = Array(this.BOARD_HEIGHT).fill().map(() => Array(this.BOARD_WIDTH).fill(false));
+        const regionDetails = [];
+        
+        // Find all connected regions using flood fill algorithm
+        for (let y = 0; y < this.BOARD_HEIGHT; y++) {
+            for (let x = 0; x < this.BOARD_WIDTH; x++) {
+                if (!visited[y][x] && this.board[y][x] !== 0) {
+                    const color = this.board[y][x];
+                    const regionCells = [];
+                    const regionSize = this.floodFillWithCells(x, y, color, visited, regionCells);
+                    
+                    // Track the largest region for each color
+                    if (!colorRegions.has(color) || regionSize > colorRegions.get(color).size) {
+                        colorRegions.set(color, {
+                            size: regionSize,
+                            cells: regionCells,
+                            centerX: regionCells.reduce((sum, cell) => sum + cell.x, 0) / regionCells.length,
+                            centerY: regionCells.reduce((sum, cell) => sum + cell.y, 0) / regionCells.length
+                        });
+                    }
+                }
+            }
+        }
+        
+        // Calculate bonus and create region data
+        const baseScore = 20;
+        let totalBonus = 0;
+        const regions = [];
+        
+        for (let [color, regionData] of colorRegions) {
+            const bonus = regionData.size * baseScore * this.level;
+            totalBonus += bonus;
+            
+            regions.push({
+                color: color,
+                size: regionData.size,
+                cells: regionData.cells,
+                centerX: regionData.centerX,
+                centerY: regionData.centerY,
+                bonus: bonus
+            });
+        }
+        
+        return { totalBonus, regions };
+    }
+    
+    // Enhanced flood fill that also returns the cells
+    floodFillWithCells(startX, startY, targetColor, visited, cells) {
+        // Boundary checks
+        if (startX < 0 || startX >= this.BOARD_WIDTH || 
+            startY < 0 || startY >= this.BOARD_HEIGHT ||
+            visited[startY][startX] || 
+            this.board[startY][startX] !== targetColor) {
+            return 0;
+        }
+        
+        // Mark as visited and add to cells
+        visited[startY][startX] = true;
+        cells.push({ x: startX, y: startY });
+        let regionSize = 1;
+        
+        // Recursively check all 4 directions
+        const directions = [
+            [0, -1], // up
+            [0, 1],  // down
+            [-1, 0], // left
+            [1, 0]   // right
+        ];
+        
+        for (let [dx, dy] of directions) {
+            regionSize += this.floodFillWithCells(startX + dx, startY + dy, targetColor, visited, cells);
+        }
+        
+        return regionSize;
+    }
+    
+    // Start the region highlighting animation
+    startRegionAnimation(regions, isFinalLevel = false) {
+        this.levelAnimationActive = true;
+        this.regionAnimations = [];
+        this.scoreDisplays = [];
+        this.isFinalLevelAnimation = isFinalLevel;
+        
+        // Color to frequency mapping for unique sounds
+        const colorSounds = {
+            '#1f77b4': 440,  // Blue - A4
+            '#ff7f0e': 523,  // Orange - C5
+            '#2ca02c': 587,  // Green - D5
+            '#d62728': 659,  // Red - E5
+            '#9467bd': 698,  // Purple - F5
+            '#8c564b': 784   // Brown - G5
+        };
+        
+        // Create animations for each region with staggered timing
+        regions.forEach((region, index) => {
+            // Calculate region bounds for sweep animation
+            const minX = Math.min(...region.cells.map(c => c.x));
+            const maxX = Math.max(...region.cells.map(c => c.x));
+            const minY = Math.min(...region.cells.map(c => c.y));
+            const maxY = Math.max(...region.cells.map(c => c.y));
+            
+            this.regionAnimations.push({
+                region: region,
+                startTime: index * 600, // 600ms delay between regions (reduced from 800ms)
+                duration: 1500, // How long the highlight lasts
+                sweepDuration: 600, // How long the sweep takes
+                progress: 0,
+                sweepProgress: 0,
+                intensity: 0,
+                completed: false,
+                sweepCompleted: false,
+                soundPlayed: false,
+                bounds: { minX, maxX, minY, maxY },
+                soundFrequency: colorSounds[region.color] || 440
+            });
+        });
+        
+        // Start the animation loop
+        this.animationStartTime = Date.now();
+    }
+    
+    // Update region animations
+    updateRegionAnimations() {
+        const now = Date.now();
+        
+        // Always update score displays with time-based animation, regardless of level animation state
+        this.scoreDisplays = this.scoreDisplays.filter(display => {
+            const age = now - display.createdTime;
+            
+            // Time-based fade out (independent of frame rate)
+            // During level animations, make region scores fade faster for quicker transitions
+            let fadeOutDuration;
+            if (display.isRowScore) {
+                fadeOutDuration = 2000; // 2s for row scores
+            } else if (this.levelAnimationActive) {
+                fadeOutDuration = 1000; // 1s for region scores during level animation
+            } else {
+                fadeOutDuration = 4000; // 4s for region scores normally
+            }
+            
+            display.life = Math.max(0, 1 - (age / fadeOutDuration));
+            
+            return display.life > 0;
+        });
+        
+        if (!this.levelAnimationActive) return;
+        
+        const currentTime = now - this.animationStartTime;
+        let allCompleted = true;
+        
+        this.regionAnimations.forEach(animation => {
+            if (!animation.completed) {
+                const timeSinceStart = currentTime - animation.startTime;
+                
+                if (timeSinceStart >= 0) {
+                    if (timeSinceStart <= animation.duration) {
+                        // Animation is active
+                        animation.progress = timeSinceStart / animation.duration;
+                        
+                        // Handle sweep animation (first part of the animation)
+                        if (timeSinceStart <= animation.sweepDuration) {
+                            animation.sweepProgress = timeSinceStart / animation.sweepDuration;
+                            
+                            // Play sound when sweep starts
+                            if (!animation.soundPlayed) {
+                                this.playSound(animation.soundFrequency, 0.4, 'triangle', 0.3);
+                                animation.soundPlayed = true;
+                            }
+                        } else {
+                            animation.sweepProgress = 1;
+                            animation.sweepCompleted = true;
+                        }
+                        
+                        // Intensity for the glow effect (peaks at 50% progress, then fades)
+                        if (animation.progress <= 0.5) {
+                            animation.intensity = animation.progress * 2; // 0 to 1
+                        } else {
+                            animation.intensity = 2 - (animation.progress * 2); // 1 to 0
+                        }
+                        
+                        // Show score display when animation starts
+                        if (timeSinceStart <= 100 && !animation.scoreShown) {
+                            this.createScoreDisplay(animation.region);
+                            animation.scoreShown = true;
+                        }
+                        
+                        allCompleted = false;
+                    } else {
+                        // Animation completed
+                        animation.completed = true;
+                        animation.intensity = 0;
+                        animation.sweepCompleted = true;
+                    }
+                } else {
+                    allCompleted = false;
+                }
+            }
+        });
+        
+        // Update score displays (moved to beginning of function, but keep this for level animations)
+        // this.scoreDisplays = this.scoreDisplays.filter(display => {
+        //     display.life -= 0.008; // Fade out slowly
+        //     return display.life > 0;
+        // });
+        
+        // If all animations are complete, show the level complete overlay or end game
+        if (allCompleted && this.scoreDisplays.length === 0) {
+            this.levelAnimationActive = false;
+            const totalRegionBonus = this.regionAnimations.reduce((sum, anim) => sum + anim.region.bonus, 0);
+            
+            if (this.isFinalLevelAnimation) {
+                // Final level completed - end the game
+                this.endGame();
+            } else {
+                // Regular level completed - show overlay
+                this.showLevelCompleteOverlay(totalRegionBonus);
+            }
+        }
+    }
+    
+    // Create a score display for a region
+    createScoreDisplay(region) {
+        this.scoreDisplays.push({
+            x: region.centerX * this.BLOCK_SIZE + this.BLOCK_SIZE / 2,
+            y: region.centerY * this.BLOCK_SIZE + this.BLOCK_SIZE / 2,
+            text: `+${region.bonus.toLocaleString()}`,
+            color: region.color, // Store the region color for text rendering
+            life: 1.0,
+            scale: 0.1, // Start small and grow
+            maxScale: 1.5,
+            createdTime: Date.now() // Track creation time for time-based animation
+        });
+    }
+    
+    // Create a score display for completed rows
+    createRowScoreDisplay(centerX, centerY, score) {
+        this.scoreDisplays.push({
+            x: centerX * this.BLOCK_SIZE + this.BLOCK_SIZE / 2,
+            y: centerY * this.BLOCK_SIZE + this.BLOCK_SIZE / 2,
+            text: `+${score.toLocaleString()}`,
+            color: '#ffffff', // White color for row completion scores
+            life: 1.0,
+            scale: 0.1, // Start small and grow
+            maxScale: 1.8, // Slightly larger than region scores
+            isRowScore: true, // Flag to differentiate from region scores
+            createdTime: Date.now() // Track creation time for time-based animation
+        });
+    }
+    
+    // Render region animations
+    renderRegionAnimations() {
+        // Always render score displays, regardless of level animation state
+        this.scoreDisplays.forEach(display => {
+            this.renderScoreDisplay(display);
+        });
+        
+        if (!this.levelAnimationActive) return;
+        
+        // Render region highlights and sweeps
+        this.regionAnimations.forEach(animation => {
+            if (animation.intensity > 0 || animation.sweepProgress > 0) {
+                this.renderRegionHighlight(animation.region, animation.intensity);
+                
+                // Render sweep effect if active
+                if (animation.sweepProgress > 0 && !animation.sweepCompleted) {
+                    this.renderRegionSweep(animation);
+                }
+            }
+        });
+    }
+    
+    // Render only region highlights and sweeps (without score displays)
+    renderRegionHighlightsOnly() {
+        if (!this.levelAnimationActive) return;
+        
+        // Render region highlights and sweeps
+        this.regionAnimations.forEach(animation => {
+            if (animation.intensity > 0 || animation.sweepProgress > 0) {
+                this.renderRegionHighlight(animation.region, animation.intensity);
+                
+                // Render sweep effect if active
+                if (animation.sweepProgress > 0 && !animation.sweepCompleted) {
+                    this.renderRegionSweep(animation);
+                }
+            }
+        });
+    }
+    
+    // Render only score displays (to be called last for proper layering)
+    renderScoreDisplaysOnly() {
+        // Always render score displays on top of everything else
+        this.scoreDisplays.forEach(display => {
+            this.renderScoreDisplay(display);
+        });
+    }
+    
+    // Render a highlighted region
+    renderRegionHighlight(region, intensity) {
+        const isLightMode = document.body.classList.contains('light-mode');
+        
+        // Create glow effect for each cell in the region
+        region.cells.forEach(cell => {
+            const pixelX = cell.x * this.BLOCK_SIZE;
+            const pixelY = cell.y * this.BLOCK_SIZE;
+            
+            // Outer glow
+            const glowSize = 8;
+            const gradient = this.ctx.createRadialGradient(
+                pixelX + this.BLOCK_SIZE / 2, pixelY + this.BLOCK_SIZE / 2, 0,
+                pixelX + this.BLOCK_SIZE / 2, pixelY + this.BLOCK_SIZE / 2, this.BLOCK_SIZE / 2 + glowSize
+            );
+            
+            const glowColor = isLightMode ?
+                `rgba(255, 255, 255, ${intensity * 0.6})` :
+                `rgba(255, 255, 255, ${intensity * 0.4})`;
+            
+            gradient.addColorStop(0, glowColor);
+            gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+            
+            this.ctx.fillStyle = gradient;
+            this.ctx.fillRect(
+                pixelX - glowSize, 
+                pixelY - glowSize, 
+                this.BLOCK_SIZE + glowSize * 2, 
+                this.BLOCK_SIZE + glowSize * 2
+            );
+            
+            // Inner bright highlight
+            this.ctx.fillStyle = `rgba(255, 255, 255, ${intensity * 0.3})`;
+            this.ctx.fillRect(pixelX, pixelY, this.BLOCK_SIZE, this.BLOCK_SIZE);
+        });
+    }
+    
+    // Render a score display
+    renderScoreDisplay(display) {
+        const isLightMode = document.body.classList.contains('light-mode');
+        const now = Date.now();
+        const age = now - display.createdTime;
+        
+        // Time-based scale animation (independent of frame rate)
+        const scaleGrowthDuration = 300; // 300ms to reach max scale
+        const scaleShrinkStart = 1000; // Start shrinking after 1 second
+        
+        if (age < scaleGrowthDuration) {
+            // Growing phase
+            display.scale = 0.1 + (display.maxScale - 0.1) * (age / scaleGrowthDuration);
+        } else if (age > scaleShrinkStart) {
+            // Shrinking phase
+            const shrinkProgress = Math.min(1, (age - scaleShrinkStart) / 1000); // 1 second shrink duration
+            display.scale = Math.max(0.8, display.maxScale - (display.maxScale - 0.8) * shrinkProgress);
+        } else {
+            // Hold at max scale
+            display.scale = display.maxScale;
+        }
+        
+        this.ctx.save();
+        this.ctx.font = `bold ${Math.floor(24 * display.scale)}px 'Segoe UI', sans-serif`;
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'middle';
+        
+        // Enhanced black drop shadow with multiple layers for maximum contrast
+        const shadowOffset = 4;
+        const shadowBlur = 6;
+        const textAlpha = display.life;
+        
+        // Strong black outer shadow for maximum contrast - with fade
+        this.ctx.shadowColor = `rgba(0, 0, 0, ${0.95 * textAlpha})`;
+        this.ctx.shadowOffsetX = shadowOffset + 2;
+        this.ctx.shadowOffsetY = shadowOffset + 2;
+        this.ctx.shadowBlur = shadowBlur + 3;
+        this.ctx.fillStyle = `rgba(0, 0, 0, ${0.9 * textAlpha})`;
+        this.ctx.fillText(display.text, display.x, display.y);
+        
+        // Additional closer black shadow for depth - with fade
+        this.ctx.shadowColor = `rgba(0, 0, 0, ${0.8 * textAlpha})`;
+        this.ctx.shadowOffsetX = shadowOffset;
+        this.ctx.shadowOffsetY = shadowOffset;
+        this.ctx.shadowBlur = shadowBlur;
+        this.ctx.fillStyle = `rgba(0, 0, 0, ${0.7 * textAlpha})`;
+        this.ctx.fillText(display.text, display.x, display.y);
+        
+        // Reset shadow for main text
+        this.ctx.shadowColor = 'transparent';
+        this.ctx.shadowOffsetX = 0;
+        this.ctx.shadowOffsetY = 0;
+        this.ctx.shadowBlur = 0;
+        
+        // Main text color - white for all score displays for clean, consistent look
+        // Apply the fade through the color alpha instead of globalAlpha
+        this.ctx.fillStyle = `rgba(255, 255, 255, ${textAlpha})`;
+        
+        this.ctx.fillText(display.text, display.x, display.y);
+        
+        this.ctx.restore();
+    }
+
+    // Helper function to draw rounded rectangles
+    drawRoundedRect(ctx, x, y, width, height, radius) {
+        ctx.beginPath();
+        ctx.moveTo(x + radius, y);
+        ctx.lineTo(x + width - radius, y);
+        ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+        ctx.lineTo(x + width, y + height - radius);
+        ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+        ctx.lineTo(x + radius, y + height);
+        ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+        ctx.lineTo(x, y + radius);
+        ctx.quadraticCurveTo(x, y, x + radius, y);
+        ctx.closePath();
+    }
+    
+    // Helper function to convert hex color to RGB
+    hexToRgb(hex) {
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result ? {
+            r: parseInt(result[1], 16),
+            g: parseInt(result[2], 16),
+            b: parseInt(result[3], 16)
+        } : { r: 255, g: 255, b: 255 };
+    }
+    
+    // Helper function to draw beveled edges for 3D effect
+    drawBevelEdge(ctx, x, y, size, bevelSize, edge, color, radius) {
+        ctx.fillStyle = color;
+        ctx.save();
+        
+        // Create clipping path for the bevel based on edge
+        ctx.beginPath();
+        
+        switch (edge) {
+            case 'top':
+                // Top bevel - trapezoid shape
+                ctx.moveTo(x + radius, y);
+                ctx.lineTo(x + size - radius, y);
+                ctx.quadraticCurveTo(x + size, y, x + size, y + radius);
+                ctx.lineTo(x + size - bevelSize, y + bevelSize);
+                ctx.lineTo(x + bevelSize, y + bevelSize);
+                ctx.lineTo(x, y + radius);
+                ctx.quadraticCurveTo(x, y, x + radius, y);
+                break;
+                
+            case 'left':
+                // Left bevel
+                ctx.moveTo(x, y + radius);
+                ctx.quadraticCurveTo(x, y, x + radius, y);
+                ctx.lineTo(x + bevelSize, y + bevelSize);
+                ctx.lineTo(x + bevelSize, y + size - bevelSize);
+                ctx.lineTo(x, y + size - radius);
+                ctx.quadraticCurveTo(x, y + size, x + radius, y + size);
+                ctx.lineTo(x, y + size - radius);
+                break;
+                
+            case 'bottom':
+                ctx.moveTo(x + radius, y + size);
+                ctx.quadraticCurveTo(x, y + size, x, y + size - radius);
+                ctx.lineTo(x + bevelSize, y + size - bevelSize);
+                ctx.lineTo(x + size - bevelSize, y + size - bevelSize);
+                ctx.lineTo(x + size, y + size - radius);
+                ctx.quadraticCurveTo(x + size, y + size, x + size - radius, y + size);
+                break;
+                
+            case 'right':
+                // Right bevel
+                ctx.moveTo(x + size, y + radius);
+                ctx.lineTo(x + size - bevelSize, y + bevelSize);
+                ctx.lineTo(x + size - bevelSize, y + size - bevelSize);
+                ctx.lineTo(x + size, y + size - radius);
+                ctx.quadraticCurveTo(x + size, y + size, x + size - radius, y + size);
+                ctx.lineTo(x + size - radius, y + size);
+                ctx.quadraticCurveTo(x + size, y + size, x + size, y + size - radius);
+                break;
+        }
+        
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+    }
+    
+    // Render sweep effect for a region
+    renderRegionSweep(animation) {
+        const isLightMode = document.body.classList.contains('light-mode');
+        const region = animation.region;
+        const bounds = animation.bounds;
+        
+        // Calculate sweep position based on region bounds
+        const regionWidth = (bounds.maxX - bounds.minX + 1) * this.BLOCK_SIZE;
+        const regionHeight = (bounds.maxY - bounds.minY + 1) * this.BLOCK_SIZE;
+        const startX = bounds.minX * this.BLOCK_SIZE;
+        const startY = bounds.minY * this.BLOCK_SIZE;
+        
+        // Sweep moves from left to right across the region
+        const sweepX = startX + (animation.sweepProgress * regionWidth);
+        const sweepWidth = 40; // Width of the sweep effect
+        
+        // Create a clipping path for the region shape
+        this.ctx.save();
+        this.ctx.beginPath();
+        
+        // Create complex path from region cells
+        const cellSize = this.BLOCK_SIZE;
+        region.cells.forEach(cell => {
+            const cellX = cell.x * cellSize;
+            const cellY = cell.y * cellSize;
+            this.ctx.rect(cellX, cellY, cellSize, cellSize);
+        });
+        
+        this.ctx.clip();
+        
+        // Create gradient for the sweep effect
+        const gradient = this.ctx.createLinearGradient(
+            sweepX - sweepWidth, 0,
+            sweepX + sweepWidth, 0
+        );
+        
+        // Parse region color for sweep effect
+        const rgb = this.hexToRgb(region.color);
+        const sweepIntensity = 0.8;
+        
+        // Create sweep gradient with region color
+        const centerColor = isLightMode ?
+            `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${sweepIntensity})` :
+            `rgba(${Math.min(255, rgb.r + 100)}, ${Math.min(255, rgb.g + 100)}, ${Math.min(255, rgb.b + 100)}, ${sweepIntensity})`;
+        const edgeColor = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0)`;
+        
+        gradient.addColorStop(0, edgeColor);
+        gradient.addColorStop(0.5, centerColor);
+        gradient.addColorStop(1, edgeColor);
+        
+        // Draw the sweep
+        this.ctx.fillStyle = gradient;
+        this.ctx.fillRect(
+            sweepX - sweepWidth,
+            startY,
+            sweepWidth * 2,
+            regionHeight
+        );
+        
+        this.ctx.restore();
     }
 }
 
